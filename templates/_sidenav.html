@@ -1,0 +1,149 @@
+{# _sidenav.html — Persistent sidebar nav (desktop ≥1024px)
+   Role-aware: SELLER / MARKET_OWNER / ADMIN / guest
+   active state ใช้ current_path จาก context_processor
+#}
+<aside class="sidebar" id="sidebar" role="navigation" aria-label="เมนูหลัก">
+
+  {# Brand #}
+  <a href="/" class="sidebar-brand" aria-label="{{ app_name }} — หน้าแรก">
+    <div class="sidebar-brand-icon" aria-hidden="true">
+      <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="" width="34" height="34" style="width:34px;height:34px;display:block">
+    </div>
+    <span class="sidebar-brand-name">{{ app_name }}</span>
+  </a>
+
+  <nav class="sidebar-nav" aria-label="เมนูนำทาง">
+
+    {# ── ความโปร่งใส — shown to ALL visitors ── #}
+    <div class="sidebar-section">ความโปร่งใส</div>
+    <a href="/transparency" title="บัญชีการจัดสรร (Ledger)"
+       class="sidebar-link {% if current_path == '/transparency' %}active{% endif %}">
+      <i data-lucide="scroll-text"></i><span>บัญชีการจัดสรร</span>
+    </a>
+    <a href="/transparency/how-it-works" title="วิธีจัดสรรอย่างเป็นธรรม"
+       class="sidebar-link {% if current_path == '/transparency/how-it-works' %}active{% endif %}">
+      <i data-lucide="scale"></i><span>วิธีจัดสรรอย่างเป็นธรรม</span>
+    </a>
+    <a href="/map" title="แผนที่ + ความหนาแน่น"
+       class="sidebar-link {% if current_path == '/map' %}active{% endif %}">
+      <i data-lucide="map"></i><span>แผนที่ + ความหนาแน่น</span>
+    </a>
+    <a href="/simulator" title="จำลองนโยบาย"
+       class="sidebar-link {% if current_path == '/simulator' %}active{% endif %}">
+      <i data-lucide="sliders-horizontal"></i><span>จำลองนโยบาย</span>
+    </a>
+    <a href="/gov" title="แดชบอร์ดเมือง (กทม.)"
+       class="sidebar-link {% if current_path == '/gov' %}active{% endif %}">
+      <i data-lucide="landmark"></i><span>แดชบอร์ด กทม.</span>
+    </a>
+
+    {% if session_role == 'ADMIN' %}
+      {# Admin nav #}
+      <div class="sidebar-section">ผู้ดูแลระบบ</div>
+      <a href="/admin" class="sidebar-link {% if current_path == '/admin' %}active{% endif %}">
+        <i data-lucide="layout-dashboard"></i><span>แดชบอร์ด</span>
+      </a>
+      <a href="/admin/markets" class="sidebar-link {% if current_path.startswith('/admin/markets') %}active{% endif %}">
+        <i data-lucide="store"></i><span>จัดการตลาด</span>
+      </a>
+      <a href="/admin/users" class="sidebar-link {% if current_path.startswith('/admin/users') %}active{% endif %}">
+        <i data-lucide="users"></i><span>จัดการผู้ใช้</span>
+      </a>
+      <a href="/admin/audit" class="sidebar-link {% if current_path.startswith('/admin/audit') %}active{% endif %}">
+        <i data-lucide="activity"></i><span>บันทึกการทำงาน</span>
+      </a>
+
+    {% elif session_role == 'MARKET_OWNER' %}
+      {# Owner nav #}
+      <div class="sidebar-section">จัดการพื้นที่</div>
+      <a href="/owner" class="sidebar-link {% if current_path == '/owner' %}active{% endif %}">
+        <i data-lucide="building-2"></i><span>พื้นที่ของฉัน</span>
+      </a>
+      <a href="/chat" class="sidebar-link {% if current_path.startswith('/chat') %}active{% endif %}">
+        <i data-lucide="message-circle"></i><span>แชท</span>
+        <span id="chat-badge" class="badge-dot hide" style="position:relative;top:auto;right:auto;margin-left:auto"></span>
+      </a>
+      <a href="/notifications" class="sidebar-link {% if current_path == '/notifications' %}active{% endif %}">
+        <i data-lucide="bell"></i><span>การแจ้งเตือน</span>
+        <span id="bell-badge" class="badge-dot hide" style="position:relative;top:auto;right:auto;margin-left:auto"></span>
+      </a>
+      <a href="/profile" class="sidebar-link {% if current_path == '/profile' %}active{% endif %}">
+        <i data-lucide="user"></i><span>โปรไฟล์</span>
+      </a>
+
+    {% else %}
+      {# Seller / Guest nav #}
+      <div class="sidebar-section">ค้นหา</div>
+      <a href="/search" class="sidebar-link {% if current_path == '/search' %}active{% endif %}">
+        <i data-lucide="search"></i><span>ค้นหาพื้นที่</span>
+      </a>
+
+      {% if me %}
+        <div class="sidebar-section" style="margin-top:.5rem">บัญชีของฉัน</div>
+        <a href="/bookings" class="sidebar-link {% if current_path == '/bookings' %}active{% endif %}">
+          <i data-lucide="calendar-check"></i><span>การจอง</span>
+        </a>
+        <a href="/chat" class="sidebar-link {% if current_path.startswith('/chat') %}active{% endif %}">
+          <i data-lucide="message-circle"></i><span>แชท</span>
+        </a>
+        <a href="/favorites" class="sidebar-link {% if current_path == '/favorites' %}active{% endif %}">
+          <i data-lucide="heart"></i><span>รายการโปรด</span>
+        </a>
+        <a href="/notifications" class="sidebar-link {% if current_path == '/notifications' %}active{% endif %}">
+          <i data-lucide="bell"></i><span>การแจ้งเตือน</span>
+          <span id="bell-badge" class="badge-dot hide" style="position:relative;top:auto;right:auto;margin-left:auto"></span>
+        </a>
+        <a href="/profile" class="sidebar-link {% if current_path == '/profile' %}active{% endif %}">
+          <i data-lucide="user"></i><span>โปรไฟล์</span>
+        </a>
+      {% else %}
+        <div class="sidebar-section" style="margin-top:.5rem">เข้าสู่ระบบ</div>
+        <a href="/login" class="sidebar-link {% if current_path == '/login' %}active{% endif %}">
+          <i data-lucide="log-in"></i><span>เข้าสู่ระบบ</span>
+        </a>
+        <a href="/register" class="sidebar-link {% if current_path == '/register' %}active{% endif %}">
+          <i data-lucide="user-plus"></i><span>สมัครสมาชิก</span>
+        </a>
+      {% endif %}
+    {% endif %}
+
+  </nav>
+
+  {# Footer — account card / auth buttons + theme toggle #}
+  <div class="sidebar-footer">
+    {% if me or session_role == 'ADMIN' %}
+      {# Account card: hidden on tablet icon-rail (text/info not visible there), logout icon shows via sidebar-link #}
+      {% set dname = me.name if me else "Admin" %}
+      {% set drole = role_label[session_role] if session_role in role_label else (session_role or "") %}
+      <div class="sidebar-account-card">
+        <div class="sidebar-account-avatar">{{ (dname[0]|upper) }}</div>
+        <div class="sidebar-account-info">
+          <div class="sidebar-account-name">{{ dname }}</div>
+          <div class="sidebar-account-role">{{ drole }}</div>
+        </div>
+      </div>
+      <a href="/settings" class="sidebar-link {% if current_path == '/settings' %}active{% endif %}">
+        <i data-lucide="settings"></i><span>ตั้งค่า</span>
+      </a>
+      <button class="sidebar-link sidebar-logout" onclick="logout()" aria-label="ออกจากระบบ" type="button" title="ออกจากระบบ">
+        <i data-lucide="log-out"></i><span>ออกจากระบบ</span>
+      </button>
+    {% else %}
+      {# Logged out — prominent auth buttons on desktop, icon links on tablet via sidebar-link #}
+      <div class="sidebar-auth-btns">
+        <a href="/login"    class="btn btn-primary btn-block btn-sm">เข้าสู่ระบบ</a>
+        <a href="/register" class="btn btn-ghost  btn-block btn-sm" style="margin-top:var(--s2)">สมัครสมาชิก</a>
+      </div>
+      <a href="/login"    class="sidebar-link sidebar-link-tablet {% if current_path == '/login'    %}active{% endif %}">
+        <i data-lucide="log-in"></i><span>เข้าสู่ระบบ</span>
+      </a>
+      <a href="/register" class="sidebar-link sidebar-link-tablet {% if current_path == '/register' %}active{% endif %}">
+        <i data-lucide="user-plus"></i><span>สมัครสมาชิก</span>
+      </a>
+    {% endif %}
+    <button class="sidebar-link" id="theme-toggle" aria-label="สลับธีมสว่าง/มืด" type="button">
+      <i data-lucide="moon"></i><span>โหมดมืด</span>
+    </button>
+  </div>
+
+</aside>

@@ -1,0 +1,709 @@
+{% extends "base.html" %}
+{% block title %}ตลาดของฉัน — {{ app_name }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endblock %}
+{% block body %}
+{% with title='คอนโซลเจ้าของตลาด', subtitle='จัดการพื้นที่และล็อกขายของ' %}{% include "_appheader.html" %}{% endwith %}
+
+{# KPI row #}
+<div class="page-pad">
+  <div id="kpi-row" class="grid4 gap3 mb4">
+    <div class="skeleton" style="height:80px;border-radius:var(--radius-lg)"></div>
+    <div class="skeleton" style="height:80px;border-radius:var(--radius-lg)"></div>
+    <div class="skeleton" style="height:80px;border-radius:var(--radius-lg)"></div>
+    <div class="skeleton" style="height:80px;border-radius:var(--radius-lg)"></div>
+  </div>
+
+  <div class="row gap2 mb3">
+    <button class="btn btn-primary flex1" onclick="toggleMarketForm()" type="button" id="add-market-btn">
+      <i data-lucide="plus" style="width:16px;height:16px" aria-hidden="true"></i>
+      เพิ่มตลาดใหม่
+    </button>
+    <button class="btn btn-soft" onclick="openWalkin()" type="button" style="gap:6px">
+      <i data-lucide="user-plus" style="width:16px;height:16px" aria-hidden="true"></i>
+      Walk-in
+    </button>
+  </div>
+
+  {# Add market form #}
+  <div id="market-form" class="card pad mb4 hide scalein">
+    <div class="label mb3">ข้อมูลตลาด</div>
+    <div class="col gap3">
+      <div class="form-group">
+        <label class="label" for="m-name">ชื่อตลาด <span style="color:var(--danger)">*</span></label>
+        <input id="m-name" class="input" placeholder="เช่น ตลาดนัดสุดสัปดาห์ รังสิต">
+      </div>
+      <div class="form-group">
+        <label class="label">ตำแหน่งบนแผนที่ <span style="color:var(--danger)">*</span></label>
+        <div class="row gap2 mb2">
+          <div class="input row gap1 flex1" style="padding:var(--s2) var(--s3)">
+            <i data-lucide="search" style="width:15px;height:15px;color:var(--ink-ghost);flex-shrink:0" aria-hidden="true"></i>
+            <input id="m-search" placeholder="ค้นหาที่อยู่..." style="border:none;outline:none;flex:1;background:none;font-size:var(--text-sm)"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();searchPlace()}">
+          </div>
+          <button class="btn btn-soft btn-sm" onclick="searchPlace()" type="button">ค้นหา</button>
+        </div>
+        <div id="pick-map" class="map-box" style="height:220px;border-radius:var(--radius-lg)"></div>
+        <div class="between mt1">
+          <button class="btn btn-ghost btn-sm" onclick="useMyLoc()" type="button">
+            <i data-lucide="locate-fixed" style="width:14px;height:14px" aria-hidden="true"></i>ตำแหน่งปัจจุบัน
+          </button>
+          <span id="pin-status" class="ghost small">แตะบนแผนที่เพื่อปักหมุด</span>
+        </div>
+      </div>
+      <div class="grid2 gap3">
+        <div class="form-group">
+          <label class="label" for="m-prov">จังหวัด</label>
+          <input id="m-prov" class="input" placeholder="เติมอัตโนมัติ">
+        </div>
+        <div class="form-group">
+          <label class="label" for="m-dist">เขต / อำเภอ</label>
+          <input id="m-dist" class="input" placeholder="เติมอัตโนมัติ">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="label" for="m-hours">เวลาเปิด-ปิด</label>
+        <input id="m-hours" class="input" placeholder="เช่น 06:00–14:00">
+      </div>
+      <div class="form-group">
+        <label class="label" for="m-tags">แท็ก <span class="ghost">(คั่นด้วยลูกน้ำ)</span></label>
+        <input id="m-tags" class="input" placeholder="อาหาร, ผัก, ของสด">
+      </div>
+      <div class="form-group">
+        <label class="label" for="m-cover">รูปหน้าปกตลาด (URL)</label>
+        <input id="m-cover" class="input" type="url" placeholder="https://...jpg"
+               oninput="previewCoverUrl('m-cover','m-cover-prev')">
+        <div class="form-hint muted small mt1">ใส่ URL รูปภาพ HTTPS — อัปโหลดไฟล์ได้หลังบันทึกตลาด</div>
+        <div id="m-cover-prev" class="mt2 hide" style="height:110px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--line);background:var(--bg-2)">
+          <img style="width:100%;height:100%;object-fit:cover" alt="ตัวอย่างรูปหน้าปก">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="label" for="m-desc">รายละเอียด</label>
+        <textarea id="m-desc" class="input" rows="2" placeholder="อธิบายตลาดของคุณ..."></textarea>
+      </div>
+    </div>
+    <div id="m-err" class="form-err mt2" role="alert" aria-live="polite"></div>
+    <div class="row gap2 mt3">
+      <button class="btn btn-ghost flex1" onclick="toggleMarketForm()" type="button">ยกเลิก</button>
+      <button id="m-save" class="btn btn-primary flex1" onclick="addMarket()" type="button">บันทึกตลาด</button>
+    </div>
+  </div>
+
+  <div id="markets" class="stagger"></div>
+</div>
+
+{# Walk-in Modal #}
+<div id="walkin-modal" class="modal-overlay hide" role="dialog" aria-modal="true" aria-labelledby="wi-title">
+  <div class="modal-box" style="max-width:480px;width:calc(100% - 32px)">
+    <div class="modal-title">
+      <span id="wi-title" style="display:flex;align-items:center;gap:8px">
+        <i data-lucide="user-plus" style="width:18px;height:18px;color:var(--brand)" aria-hidden="true"></i>
+        Walk-in / ลงทะเบียนแทน
+      </span>
+      <button onclick="closeWalkin()" class="btn btn-icon" type="button" aria-label="ปิด">
+        <i data-lucide="x" style="width:18px;height:18px" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div id="wi-form-wrap">
+        <div class="col gap3">
+          <div class="form-group">
+            <label class="label" for="wi-phone">เบอร์โทรผู้ค้า <span style="color:var(--danger)">*</span></label>
+            <input id="wi-phone" class="input" placeholder="0812345678" maxlength="10" inputmode="numeric" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label class="label" for="wi-name">ชื่อ-นามสกุล <span style="color:var(--danger)">*</span></label>
+            <input id="wi-name" class="input" placeholder="ชื่อผู้ค้า" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label class="label" for="wi-market">ตลาด <span style="color:var(--danger)">*</span></label>
+            <select id="wi-market" class="input" onchange="walkinFillLots()">
+              <option value="">— เลือกตลาด —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="label" for="wi-lot">ล็อก <span style="color:var(--danger)">*</span></label>
+            <select id="wi-lot" class="input">
+              <option value="">— เลือกตลาดก่อน —</option>
+            </select>
+          </div>
+          <div class="grid2 gap3">
+            <div class="form-group">
+              <label class="label" for="wi-start">วันที่เริ่ม <span style="color:var(--danger)">*</span></label>
+              <input id="wi-start" class="input" type="date">
+            </div>
+            <div class="form-group">
+              <label class="label" for="wi-end">วันที่สิ้นสุด</label>
+              <input id="wi-end" class="input" type="date">
+            </div>
+          </div>
+        </div>
+        <div id="wi-err" class="form-err mt2" role="alert" aria-live="polite"></div>
+      </div>
+
+      {# Success panel #}
+      <div id="wi-success" class="hide" style="background:hsl(142,60%,96%);border:1px solid hsl(142,60%,80%);border-radius:var(--radius-lg);padding:18px">
+        <div style="color:hsl(142,60%,28%);font-weight:700;font-size:1rem;margin-bottom:10px">
+          <i data-lucide="check-circle-2" style="width:18px;height:18px;vertical-align:-.2em;margin-right:4px" aria-hidden="true"></i>
+          Walk-in จองสำเร็จ!
+        </div>
+        <div id="wi-success-body" style="font-size:.85rem;color:var(--ink);line-height:1.9"></div>
+        <div class="row gap2 mt3">
+          <a id="wi-print-link" href="#" class="btn btn-soft btn-sm flex1" target="_blank" rel="noopener">
+            <i data-lucide="printer" style="width:14px;height:14px" aria-hidden="true"></i> พิมพ์ใบยืนยัน
+          </a>
+          <button class="btn btn-ghost btn-sm flex1" onclick="resetWalkin()" type="button">
+            Walk-in รายถัดไป
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" id="wi-footer">
+      <button class="btn btn-ghost" onclick="closeWalkin()" type="button">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="submitWalkin()" type="button" id="wi-submit">
+        <i data-lucide="calendar-check" style="width:15px;height:15px" aria-hidden="true"></i>
+        จองทันที (Walk-in)
+      </button>
+    </div>
+  </div>
+</div>
+
+{% with active='owner' %}{% include "_bottomnav.html" %}{% endwith %}
+{% endblock %}
+{% block script %}<script>
+let pickMap = null, pinMarker = null, pin = { lat: null, lng: null }, ownerMarkets = [];
+
+// ---- Map helpers ----
+function toggleMarketForm() {
+  const f = $("#market-form");
+  f.classList.toggle("hide");
+  if (!f.classList.contains("hide")) setTimeout(initPickMap, 60);
+}
+function initPickMap() {
+  if (pickMap) { pickMap.invalidateSize(); return; }
+  pickMap = L.map("pick-map").setView([13.7466, 100.5347], 11);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OSM" }).addTo(pickMap);
+  pickMap.on("click", e => setPin(e.latlng.lat, e.latlng.lng));
+  pickMap.invalidateSize();
+}
+async function setPin(lat, lng, recenter) {
+  pin = { lat, lng };
+  const icon = L.divIcon({ className:"", html:'<div style="font-size:28px">📍</div>', iconSize:[28,28], iconAnchor:[14,28] });
+  if (pinMarker) pinMarker.setLatLng([lat, lng]);
+  else pinMarker = L.marker([lat, lng], { icon }).addTo(pickMap);
+  if (recenter) pickMap.setView([lat, lng], 15);
+  const ps = $("#pin-status");
+  if (ps) ps.textContent = "ปักหมุดแล้ว ✓";
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=th`).then(x => x.json());
+    const a = r.address || {};
+    const prov = $("#m-prov"), dist = $("#m-dist");
+    if (prov && !prov.value) prov.value = a.province || a.state || a.city || "";
+    if (dist && !dist.value) dist.value = a.city_district || a.suburb || a.county || a.district || a.town || "";
+  } catch (_) {}
+}
+async function searchPlace() {
+  const q = ($("#m-search") && $("#m-search").value.trim()) || "";
+  if (!q) return;
+  const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=th&limit=1&accept-language=th&q=${encodeURIComponent(q)}`).then(x => x.json());
+  if (res[0]) setPin(parseFloat(res[0].lat), parseFloat(res[0].lon), true);
+  else Toast.warn("ไม่พบสถานที่");
+}
+function useMyLoc() {
+  if (!navigator.geolocation) { Toast.warn("เบราว์เซอร์ไม่รองรับ GPS"); return; }
+  navigator.geolocation.getCurrentPosition(
+    p => setPin(p.coords.latitude, p.coords.longitude, true),
+    () => Toast.error("ไม่สามารถดึงตำแหน่ง")
+  );
+}
+
+// ---- Add market ----
+async function addMarket() {
+  const err = $("#m-err");
+  if (err) err.textContent = "";
+  if (pin.lat == null) { if (err) err.textContent = "กรุณาปักหมุดบนแผนที่"; return; }
+  const name = ($("#m-name") && $("#m-name").value.trim()) || "";
+  if (!name) { if (err) err.textContent = "กรุณากรอกชื่อตลาด"; return; }
+  const btn = $("#m-save");
+  setBtnLoading(btn, true);
+  const coverInput = $("#m-cover");
+  const rawCover = coverInput ? coverInput.value.trim() : "";
+  const d = await API.post("/markets", {
+    name,
+    province: ($("#m-prov") && $("#m-prov").value.trim()) || "",
+    district: ($("#m-dist") && $("#m-dist").value.trim()) || "",
+    lat: pin.lat, lng: pin.lng,
+    description: ($("#m-desc") && $("#m-desc").value.trim()) || "",
+    openingHours: ($("#m-hours") && $("#m-hours").value.trim()) || "",
+    tags: ($("#m-tags") && $("#m-tags").value.trim()) || "",
+    coverPhotoUrl: safeUrl(rawCover),
+  });
+  setBtnLoading(btn, false);
+  if (!d.ok) { if (err) err.textContent = d.error || "เกิดข้อผิดพลาด"; return; }
+  Toast.success("เพิ่มตลาดสำเร็จ!");
+  const f = $("#market-form");
+  if (f) { f.classList.add("hide"); }
+  ["m-name","m-prov","m-dist","m-desc","m-hours","m-tags","m-cover"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+  pin = { lat: null, lng: null };
+  if (pinMarker) { pinMarker.remove(); pinMarker = null; }
+  load();
+}
+
+// ---- Load markets ----
+async function load() {
+  const wrap = $("#markets");
+  wrap.innerHTML = skelCards(2);
+  const d = await API.get("/owner/markets");
+
+  // KPI
+  if (d.markets && d.markets.length) {
+    const totalLots  = d.markets.reduce((s, m) => s + m.totalLots, 0);
+    const availLots  = d.markets.reduce((s, m) => s + m.availableLots, 0);
+    const totalBook  = d.markets.reduce((s, m) => s + (m.bookings || 0), 0);
+    const revenue    = d.markets.reduce((s, m) => s + (m.revenue || 0), 0);
+    const kpi = $("#kpi-row");
+    if (kpi) kpi.innerHTML = [
+      ["store",         "ตลาดของฉัน",  d.markets.length,  "var(--brand)"],
+      ["grid-3x3",      "ล็อกทั้งหมด", totalLots,         "#7950f2"],
+      ["calendar-check","การจอง",       totalBook,         "#0ea5e9"],
+      ["banknote",      "รายได้รวม",   thb(revenue),      "var(--success-ink)"],
+    ].map(([icon, label, val, color]) =>
+      `<div class="stat-card">
+        <i data-lucide="${icon}" style="width:20px;height:20px;color:${color}" aria-hidden="true"></i>
+        <div class="stat-value">${val}</div>
+        <div class="stat-label">${label}</div>
+      </div>`
+    ).join("");
+    icons(kpi);
+  }
+
+  if (!d.markets || !d.markets.length) {
+    wrap.innerHTML = `<div class="card pad center-text muted">
+      <i data-lucide="store" style="width:40px;height:40px;color:var(--ink-ghost)"></i>
+      <div class="mt2">ยังไม่มีตลาด</div>
+      <div class="small mt1">กด "เพิ่มตลาด" เพื่อเริ่มต้น</div>
+    </div>`;
+    icons(wrap);
+    return;
+  }
+
+  ownerMarkets = d.markets;
+  wrap.innerHTML = d.markets.map(m => marketCard(m)).join("");
+  icons(wrap);
+}
+
+function lotRow(l, mid) {
+  const booked = l.status === "BOOKED", closed = l.status === "CLOSED";
+  return `<div class="lot-row" id="lot-row-${l.id}">
+    <div class="row gap2" style="min-width:0;flex:1">
+      <span class="bold sub" style="min-width:40px">${esc(l.code)}</span>
+      <span class="chip chip-sm">${esc(C.RENT_TYPE_LABEL[l.rentType] || l.rentType)}</span>
+      <span class="muted small">${thb(l.pricePerDay)}/วัน</span>
+      ${booked ? `<span class="chip chip-danger chip-sm">จองแล้ว</span>` : closed ? `<span class="chip chip-sm">ปิด</span>` : ""}
+    </div>
+    <div class="row gap1">
+      <button class="btn btn-icon sm" onclick="editLotInline('${l.id}')" type="button"
+              aria-label="แก้ไขล็อก ${esc(l.code)}" title="แก้ไข"
+              style="border:1px solid var(--line)">
+        <i data-lucide="pencil" style="width:13px;height:13px" aria-hidden="true"></i>
+      </button>
+      ${!booked ? `<button class="btn btn-icon sm" onclick="toggleLot('${l.id}')" type="button"
+              aria-label="${closed ? "เปิด" : "ปิด"}ล็อก ${esc(l.code)}" title="${closed ? "เปิด" : "ปิด"}"
+              style="border:1px solid var(--line);color:${closed ? "var(--success-ink)" : "var(--ink-soft)"}">
+        <i data-lucide="power" style="width:13px;height:13px" aria-hidden="true"></i>
+      </button>` : ""}
+      <button class="btn btn-icon sm" type="button"
+              data-action="del-lot" data-lid="${l.id}" data-code="${escAttr(l.code)}"
+              aria-label="ลบล็อก ${escAttr(l.code)}" title="ลบ"
+              style="border:1px solid var(--line);color:var(--danger-ink)">
+        <i data-lucide="trash-2" style="width:13px;height:13px" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>`;
+}
+
+function marketCard(m) {
+  return `<div class="card pad mt3" id="market-card-${m.id}">
+    <div class="between mb2">
+      <div>
+        <div class="bold" style="font-size:var(--text-base)">${esc(m.name)}</div>
+        <div class="muted sub">${esc(m.district || "")}${m.district ? ", " : ""}${esc(m.province)}</div>
+        ${m.avgRating ? `<div class="row gap1 mt1">${stars(m.avgRating, 12)}<span class="ghost small">${m.avgRating.toFixed(1)}</span></div>` : ""}
+      </div>
+      <button class="btn btn-icon" onclick="confirmDelMarket('${m.id}')" type="button"
+              aria-label="ลบตลาด ${esc(m.name)}"
+              style="border:1px solid var(--line);color:var(--danger-ink)">
+        <i data-lucide="trash-2" style="width:16px;height:16px" aria-hidden="true"></i>
+      </button>
+    </div>
+
+    <div class="row gap1 flex-wrap mb3">
+      <span class="chip">ล็อก ${m.totalLots}</span>
+      <span class="chip" style="background:var(--success-soft);color:var(--success-ink)">ว่าง ${m.availableLots}</span>
+      <span class="chip" style="background:#eaefff;color:#2540c9">จอง ${m.bookings || 0}</span>
+      ${m.revenue ? `<span class="chip" style="background:var(--warn-soft);color:var(--warn-ink)">${thb(m.revenue)}</span>` : ""}
+    </div>
+
+    <div class="mb3">
+      <div class="row gap2 mb1" style="align-items:center">
+        ${m.coverPhotoUrl
+          ? `<img src="${escAttr(m.coverPhotoUrl)}" alt="หน้าปก" style="width:64px;height:42px;border-radius:var(--radius-sm);object-fit:cover;border:1px solid var(--line);flex-shrink:0" onerror="this.style.display='none'">`
+          : `<div style="width:64px;height:42px;border-radius:var(--radius-sm);background:linear-gradient(160deg,var(--brand-300),var(--brand-700));flex-shrink:0"></div>`
+        }
+        <button class="btn btn-ghost btn-sm flex1" onclick="toggleEl('cover-form-${m.id}')" type="button" style="justify-content:flex-start">
+          <i data-lucide="image" style="width:13px;height:13px"></i>
+          ${m.coverPhotoUrl ? 'เปลี่ยนรูปหน้าปก' : 'เพิ่มรูปหน้าปก'}
+        </button>
+      </div>
+      <div id="cover-form-${m.id}" class="hide" style="background:var(--bg-2);border-radius:var(--radius);padding:var(--s3)">
+        <div class="form-group mb2">
+          <label class="label" style="font-size:.72rem" for="cover-url-${m.id}">URL รูปภาพ (https)</label>
+          <input id="cover-url-${m.id}" class="input" type="url" placeholder="https://..."
+                 value="${escAttr(m.coverPhotoUrl || '')}"
+                 oninput="previewCoverUrl('cover-url-${m.id}','cover-prev-${m.id}')">
+        </div>
+        <div id="cover-prev-${m.id}" class="${m.coverPhotoUrl ? '' : 'hide'}" style="height:90px;border-radius:var(--radius-sm);overflow:hidden;border:1px solid var(--line);background:var(--bg);margin-bottom:var(--s2)">
+          <img src="${escAttr(m.coverPhotoUrl || '')}" style="width:100%;height:100%;object-fit:cover" alt="preview">
+        </div>
+        <div class="row gap2">
+          <label class="btn btn-soft btn-sm flex1" style="cursor:pointer;justify-content:center">
+            <i data-lucide="upload" style="width:13px;height:13px"></i>อัปโหลดไฟล์
+            <input type="file" accept="image/*" style="display:none" onchange="uploadCoverFile(this,'${m.id}','cover-prev-${m.id}')">
+          </label>
+          <button class="btn btn-primary btn-sm flex1" onclick="saveCoverUrl('${m.id}')" type="button">บันทึก URL</button>
+        </div>
+      </div>
+    </div>
+
+    ${m.lots && m.lots.length
+      ? `<div class="col gap1 mb3">${m.lots.map(l => lotRow(l, m.id)).join("")}</div>`
+      : `<div class="muted small mb3">ยังไม่มีล็อก</div>`
+    }
+
+    {# Bulk lot add #}
+    <div id="bulk-form-${m.id}" class="card pad hide" style="background:var(--bg-2);margin-bottom:var(--s2)">
+      <div class="label mb2">เพิ่มล็อกแบบกลุ่ม</div>
+      <div class="grid2 gap2 mb2">
+        <div class="form-group">
+          <label class="label" style="font-size:.7rem" for="bl-prefix-${m.id}">ตัวอักษรนำหน้า</label>
+          <input id="bl-prefix-${m.id}" class="input" placeholder="A" maxlength="4">
+        </div>
+        <div class="form-group">
+          <label class="label" style="font-size:.7rem">ช่วง</label>
+          <div class="row gap1">
+            <input id="bl-start-${m.id}" class="input" type="number" min="1" placeholder="1" style="width:60px">
+            <span class="muted">—</span>
+            <input id="bl-end-${m.id}" class="input" type="number" min="1" placeholder="10" style="width:60px">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="label" style="font-size:.7rem" for="bl-price-${m.id}">ราคา/วัน</label>
+          <input id="bl-price-${m.id}" class="input" type="number" min="0" placeholder="200" inputmode="numeric">
+        </div>
+        <div class="form-group">
+          <label class="label" style="font-size:.7rem" for="bl-rent-${m.id}">ประเภทเช่า</label>
+          <select id="bl-rent-${m.id}" class="input">
+            ${Object.entries(C.RENT_TYPE_LABEL).map(([v,l]) => `<option value="${v}">${esc(l)}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <input id="bl-note-${m.id}" class="input mb2" placeholder="หมายเหตุ (ไม่บังคับ)">
+      <div id="bl-err-${m.id}" class="form-err" role="alert" aria-live="polite"></div>
+      <div class="row gap2">
+        <button class="btn btn-ghost flex1 btn-sm" onclick="document.getElementById('bulk-form-${m.id}').classList.add('hide')" type="button">ยกเลิก</button>
+        <button class="btn btn-primary flex1 btn-sm" onclick="bulkAddLots('${m.id}')" type="button">สร้างล็อก</button>
+      </div>
+    </div>
+
+    {# Single lot add #}
+    <div id="single-form-${m.id}" class="card pad hide" style="background:var(--bg-2);margin-bottom:var(--s2)">
+      <div class="label mb2">เพิ่มล็อกเดี่ยว</div>
+      <div class="grid2 gap2 mb2">
+        <div class="form-group">
+          <label class="label" style="font-size:.7rem" for="lc-${m.id}">รหัสล็อก</label>
+          <input id="lc-${m.id}" class="input" placeholder="A1">
+        </div>
+        <div class="form-group">
+          <label class="label" style="font-size:.7rem" for="lp-${m.id}">ราคา/วัน</label>
+          <input id="lp-${m.id}" class="input" type="number" placeholder="200" inputmode="numeric">
+        </div>
+        <div class="form-group">
+          <label class="label" style="font-size:.7rem" for="lr-${m.id}">ประเภทเช่า</label>
+          <select id="lr-${m.id}" class="input">
+            ${Object.entries(C.RENT_TYPE_LABEL).map(([v,l]) => `<option value="${v}">${esc(l)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="label" style="font-size:.7rem" for="ln-${m.id}">หมายเหตุ</label>
+          <input id="ln-${m.id}" class="input" placeholder="ไม่บังคับ">
+        </div>
+      </div>
+      <div class="row gap2">
+        <button class="btn btn-ghost flex1 btn-sm" onclick="document.getElementById('single-form-${m.id}').classList.add('hide')" type="button">ยกเลิก</button>
+        <button class="btn btn-primary flex1 btn-sm" onclick="addLot('${m.id}')" type="button">เพิ่มล็อก</button>
+      </div>
+    </div>
+
+    <div class="row gap2">
+      <button class="btn btn-soft flex1 btn-sm" onclick="toggleEl('bulk-form-${m.id}')" type="button">
+        <i data-lucide="layers" style="width:14px;height:14px" aria-hidden="true"></i>เพิ่มแบบกลุ่ม
+      </button>
+      <button class="btn btn-ghost flex1 btn-sm" onclick="toggleEl('single-form-${m.id}')" type="button">
+        <i data-lucide="plus" style="width:14px;height:14px" aria-hidden="true"></i>เพิ่มล็อกเดี่ยว
+      </button>
+    </div>
+  </div>`;
+}
+
+function toggleEl(id) { const el = document.getElementById(id); if (el) el.classList.toggle("hide"); }
+
+async function toggleLot(id) {
+  const d = await API.patch("/lots/" + id);
+  if (!d.ok) { Toast.error(d.error); return; }
+  load();
+}
+
+async function delLot(id, code) {
+  const ok = await confirmDialog(`ลบล็อก "${code}"?`, { okLabel: "ลบ" });
+  if (!ok) return;
+  const d = await API.del("/lots/" + id);
+  if (!d.ok) { Toast.error(d.error); return; }
+  Toast.success("ลบล็อกแล้ว");
+  load();
+}
+
+async function confirmDelMarket(id) {
+  const ok = await confirmDialog("ลบตลาดนี้ทั้งหมด? ล็อกและการจองทั้งหมดจะถูกลบ", { okLabel: "ลบทั้งหมด", title: "ยืนยันการลบตลาด" });
+  if (!ok) return;
+  const d = await API.del("/markets/" + id);
+  if (!d.ok) { Toast.error(d.error); return; }
+  Toast.success("ลบตลาดแล้ว");
+  load();
+}
+
+async function addLot(mid) {
+  const d = await API.post("/lots", {
+    marketId: mid,
+    code: document.getElementById("lc-" + mid).value.trim(),
+    pricePerDay: parseFloat(document.getElementById("lp-" + mid).value) || 0,
+    rentType: document.getElementById("lr-" + mid).value,
+    note: document.getElementById("ln-" + mid).value.trim(),
+  });
+  if (!d.ok) { Toast.error(d.error); return; }
+  Toast.success("เพิ่มล็อกแล้ว");
+  load();
+}
+
+async function bulkAddLots(mid) {
+  const prefix = document.getElementById("bl-prefix-" + mid).value.trim() || "A";
+  const start  = parseInt(document.getElementById("bl-start-" + mid).value) || 1;
+  const end    = parseInt(document.getElementById("bl-end-" + mid).value)   || 10;
+  const price  = parseFloat(document.getElementById("bl-price-" + mid).value) || 0;
+  const rent   = document.getElementById("bl-rent-" + mid).value;
+  const note   = document.getElementById("bl-note-" + mid).value.trim();
+  const errEl  = document.getElementById("bl-err-" + mid);
+
+  if (end < start) { if (errEl) errEl.textContent = "ช่วงตัวเลขไม่ถูกต้อง"; return; }
+  if (end - start > 99) { if (errEl) errEl.textContent = "สร้างได้สูงสุด 100 ล็อกต่อครั้ง"; return; }
+  if (errEl) errEl.textContent = "";
+
+  const d = await API.post("/lots/bulk", { marketId: mid, prefix, start, end, pricePerDay: price, rentType: rent, note });
+  if (!d.ok) { if (errEl) errEl.textContent = d.error || "เกิดข้อผิดพลาด"; return; }
+  Toast.success(`สร้าง ${d.count || (end - start + 1)} ล็อกสำเร็จ`);
+  load();
+}
+
+function editLotInline(lid) {
+  const row = document.getElementById("lot-row-" + lid);
+  if (!row) return;
+  const codeSpan = row.querySelector(".bold");
+  const priceSpan = row.querySelector(".muted.small");
+  const currentCode = codeSpan ? codeSpan.textContent : "";
+  const currentPrice = priceSpan ? parseInt(priceSpan.textContent.replace(/\D/g,"")) || 0 : 0;
+
+  row.insertAdjacentHTML("afterend", `
+    <div id="edit-lot-${lid}" class="card pad" style="background:var(--bg-2);margin-top:4px">
+      <div class="grid2 gap2 mb2">
+        <div class="form-group">
+          <label class="label" style="font-size:.7rem">รหัสล็อก</label>
+          <input id="el-code-${lid}" class="input" value="${esc(currentCode)}">
+        </div>
+        <div class="form-group">
+          <label class="label" style="font-size:.7rem">ราคา/วัน</label>
+          <input id="el-price-${lid}" class="input" type="number" value="${currentPrice}">
+        </div>
+        <div class="form-group">
+          <label class="label" style="font-size:.7rem">ประเภทเช่า</label>
+          <select id="el-rent-${lid}" class="input">
+            ${Object.entries(C.RENT_TYPE_LABEL).map(([v,l]) => `<option value="${v}">${esc(l)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="label" style="font-size:.7rem">หมายเหตุ</label>
+          <input id="el-note-${lid}" class="input" placeholder="">
+        </div>
+      </div>
+      <div class="row gap2">
+        <button class="btn btn-ghost flex1 btn-sm" onclick="document.getElementById('edit-lot-${lid}').remove()" type="button">ยกเลิก</button>
+        <button class="btn btn-primary flex1 btn-sm" onclick="saveLotEdit('${lid}')" type="button">บันทึก</button>
+      </div>
+    </div>`);
+}
+
+async function saveLotEdit(lid) {
+  const code      = document.getElementById("el-code-"  + lid).value.trim();
+  const price     = parseFloat(document.getElementById("el-price-" + lid).value) || 0;
+  const rentType  = document.getElementById("el-rent-"  + lid).value;
+  const note      = document.getElementById("el-note-"  + lid).value.trim();
+  const d = await API.put("/lots/" + lid, { code, pricePerDay: price, rentType, note });
+  if (!d.ok) { Toast.error(d.error); return; }
+  Toast.success("บันทึกล็อกแล้ว");
+  const editEl = document.getElementById("edit-lot-" + lid);
+  if (editEl) editEl.remove();
+  load();
+}
+
+// Event delegation for lot actions — keeps user data out of onclick strings
+document.getElementById("markets").addEventListener("click", e => {
+  const btn = e.target.closest("[data-action]");
+  if (!btn) return;
+  if (btn.dataset.action === "del-lot") delLot(btn.dataset.lid, btn.dataset.code);
+});
+
+// ---- Cover photo helpers ----
+function previewCoverUrl(inputId, prevId) {
+  const url = safeUrl((document.getElementById(inputId) || {}).value || "");
+  const prev = document.getElementById(prevId);
+  if (!prev) return;
+  if (url) {
+    prev.classList.remove("hide");
+    const img = prev.querySelector("img");
+    if (img) { img.src = url; img.onerror = () => prev.classList.add("hide"); }
+  } else {
+    prev.classList.add("hide");
+  }
+}
+async function saveCoverUrl(mid) {
+  const urlEl = document.getElementById("cover-url-" + mid);
+  const url = safeUrl((urlEl || {}).value || "");
+  const d = await API.patch("/markets/" + mid, { coverPhotoUrl: url });
+  if (!d.ok) { Toast.error(d.error); return; }
+  Toast.success("บันทึกรูปหน้าปกแล้ว");
+  toggleEl("cover-form-" + mid);
+  load();
+}
+async function uploadCoverFile(input, mid, prevId) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const prev = document.getElementById(prevId);
+    if (prev) { prev.classList.remove("hide"); const img = prev.querySelector("img"); if (img) img.src = e.target.result; }
+  };
+  reader.readAsDataURL(file);
+  const fd = new FormData();
+  fd.append("file", file);
+  try {
+    const r = await fetch("/api/markets/" + mid + "/cover", { method: "POST", body: fd });
+    const d = await r.json();
+    if (!d.ok) { Toast.error(d.error || "อัปโหลดไม่สำเร็จ"); return; }
+    Toast.success("อัปโหลดรูปสำเร็จ!");
+    load();
+  } catch (_) { Toast.error("อัปโหลดล้มเหลว"); }
+}
+
+// ---- Walk-in / Inclusion ----
+function openWalkin() {
+  const today = new Date().toISOString().split("T")[0];
+  document.getElementById("wi-start").value = today;
+  document.getElementById("wi-end").value   = today;
+  const sel = document.getElementById("wi-market");
+  sel.innerHTML = '<option value="">— เลือกตลาด —</option>';
+  ownerMarkets.forEach(m => {
+    const opt = document.createElement("option");
+    opt.value = m.id; opt.textContent = m.name;
+    sel.appendChild(opt);
+  });
+  document.getElementById("wi-success").classList.add("hide");
+  document.getElementById("wi-form-wrap").classList.remove("hide");
+  document.getElementById("wi-footer").classList.remove("hide");
+  document.getElementById("wi-err").textContent = "";
+  document.getElementById("walkin-modal").classList.remove("hide");
+  document.body.style.overflow = "hidden";
+  icons(document.getElementById("walkin-modal"));
+}
+
+function closeWalkin() {
+  document.getElementById("walkin-modal").classList.add("hide");
+  document.body.style.overflow = "";
+}
+
+function resetWalkin() {
+  ["wi-phone","wi-name"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+  document.getElementById("wi-lot").innerHTML = '<option value="">— เลือกตลาดก่อน —</option>';
+  document.getElementById("wi-market").value  = "";
+  document.getElementById("wi-err").textContent = "";
+  const today = new Date().toISOString().split("T")[0];
+  document.getElementById("wi-start").value = today;
+  document.getElementById("wi-end").value   = today;
+  document.getElementById("wi-success").classList.add("hide");
+  document.getElementById("wi-form-wrap").classList.remove("hide");
+  document.getElementById("wi-footer").classList.remove("hide");
+}
+
+function walkinFillLots() {
+  const mid  = document.getElementById("wi-market").value;
+  const lots = document.getElementById("wi-lot");
+  const m    = ownerMarkets.find(m => m.id === mid);
+  lots.innerHTML = "";
+  if (!m) { lots.innerHTML = '<option value="">— เลือกตลาดก่อน —</option>'; return; }
+  const avail = (m.lots || []).filter(l => l.status === "AVAILABLE");
+  if (!avail.length) { lots.innerHTML = '<option value="">ไม่มีล็อกว่าง</option>'; return; }
+  avail.forEach(l => {
+    const opt = document.createElement("option");
+    opt.value = l.id;
+    opt.textContent = `${l.code} — ${thb(l.pricePerDay)}/วัน`;
+    lots.appendChild(opt);
+  });
+}
+
+async function submitWalkin() {
+  const errEl = document.getElementById("wi-err");
+  errEl.textContent = "";
+  const phone = (document.getElementById("wi-phone").value || "").trim();
+  const name  = (document.getElementById("wi-name").value || "").trim();
+  const lotId = document.getElementById("wi-lot").value;
+  const start = document.getElementById("wi-start").value;
+  const end   = document.getElementById("wi-end").value;
+  if (!phone || !name || !lotId || !start) {
+    errEl.textContent = "กรุณากรอกข้อมูลให้ครบ"; return;
+  }
+  const btn = document.getElementById("wi-submit");
+  setBtnLoading(btn, true);
+  const payload = { phone, name, lotId, startDate: start };
+  if (end && end !== start) payload.endDate = end;
+  const d = await API.post("/walkin/booking", payload);
+  setBtnLoading(btn, false);
+  if (!d.ok) { errEl.textContent = d.error || "เกิดข้อผิดพลาด"; return; }
+  document.getElementById("wi-form-wrap").classList.add("hide");
+  document.getElementById("wi-footer").classList.add("hide");
+  const body = document.getElementById("wi-success-body");
+  body.innerHTML = `
+    <div>ผู้ค้า: <strong>${esc(d.sellerName)}</strong>${d.createdNewSeller
+      ? ' <span style="background:var(--brand-soft);color:var(--brand);border-radius:8px;padding:1px 7px;font-size:.72rem;font-weight:700">ใหม่</span>' : ''}</div>
+    <div>ล็อก: <strong>${esc(d.lotCode)}</strong> — ${esc(d.marketName)}</div>
+    <div>วันที่: ${esc(d.date)}${d.endDate ? ' — ' + esc(d.endDate) : ''}</div>
+    <div>มัดจำ: <strong>${thb(d.depositAmount)}</strong></div>
+  `;
+  document.getElementById("wi-print-link").href = d.printUrl;
+  document.getElementById("wi-success").classList.remove("hide");
+  icons(document.getElementById("wi-success"));
+  Toast.success("Walk-in จองสำเร็จ!");
+  load();
+}
+
+load();
+</script>{% endblock %}

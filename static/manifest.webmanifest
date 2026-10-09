@@ -1,0 +1,43 @@
+{
+  "name": "Smart Hawker — เปิดพื้นที่ค้าขาย",
+  "short_name": "SmartHawker",
+  "description": "แพลตฟอร์มเปิดพื้นที่ว่างให้พ่อค้าแม่ค้า จัดสรรอย่างโปร่งใสและเป็นธรรม",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#161618",
+  "theme_color": "#ec135b",
+  "orientation": "portrait-primary",
+  "lang": "th",
+  "icons": [
+    {
+      "src": "/static/img/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["business", "utilities"],
+  "shortcuts": [
+    {
+      "name": "ค้นหาพื้นที่",
+      "short_name": "ค้นหา",
+      "description": "ค้นหาพื้นที่ขายของและล็อกว่าง",
+      "url": "/search",
+      "icons": [{ "src": "/static/img/logo.svg", "sizes": "any" }]
+    },
+    {
+      "name": "ตรวจสอบความโปร่งใส",
+      "short_name": "Ledger",
+      "description": "ดูบัญชีการจัดสรรทั้งหมด",
+      "url": "/transparency",
+      "icons": [{ "src": "/static/img/logo.svg", "sizes": "any" }]
+    }
+  ]
+}

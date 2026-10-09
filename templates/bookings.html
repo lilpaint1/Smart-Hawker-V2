@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}การจองของฉัน — {{ app_name }}{% endblock %}
+{% block body %}
+{% with title='การจองของฉัน', subtitle='ติดตามสถานะการจองล็อกทั้งหมด' %}{% include "_appheader.html" %}{% endwith %}
+
+<div class="page-pad">
+  <div class="row gap2 mb3" role="group" aria-label="กรองสถานะ">
+    <button class="chip chip-active" id="tab-all"       onclick="setTab('all')"       type="button">ทั้งหมด</button>
+    <button class="chip"             id="tab-PENDING"   onclick="setTab('PENDING')"   type="button">รอชำระ</button>
+    <button class="chip"             id="tab-CONFIRMED" onclick="setTab('CONFIRMED')" type="button">ยืนยันแล้ว</button>
+    <button class="chip"             id="tab-CANCELLED" onclick="setTab('CANCELLED')" type="button">ยกเลิก</button>
+  </div>
+
+  <div id="list" class="stagger"></div>
+</div>
+
+{% with active='bookings' %}{% include "_bottomnav.html" %}{% endwith %}
+{% endblock %}
+{% block script %}<script>
+let allBookings = [], currentTab = "all";
+
+const STATUS_CONFIG = {
+  PENDING:   { label: "รอชำระเงิน",  bg: "var(--warn-soft)",    color: "var(--warn-ink)",    icon: "clock" },
+  CONFIRMED: { label: "ยืนยันแล้ว",  bg: "var(--success-soft)", color: "var(--success-ink)", icon: "check-circle-2" },
+  CANCELLED: { label: "ยกเลิก",      bg: "var(--danger-soft)",  color: "var(--danger-ink)",  icon: "x-circle" },
+};
+
+function setTab(tab) {
+  currentTab = tab;
+  for (const id of ["all","PENDING","CONFIRMED","CANCELLED"]) {
+    const el = $("#tab-" + id);
+    if (el) el.classList.toggle("chip-active", id === tab);
+  }
+  render();
+}
+
+function render() {
+  const list = $("#list");
+  const filtered = currentTab === "all"
+    ? allBookings
+    : allBookings.filter(b => b.status === currentTab);
+
+  if (!filtered.length) {
+    list.innerHTML = `<div class="card pad center-text muted mt2">
+      <i data-lucide="calendar-x-2" style="width:40px;height:40px;color:var(--ink-ghost)"></i>
+      <div class="mt2">${currentTab === "all" ? "ยังไม่มีการจอง" : "ไม่มีการจองในสถานะนี้"}</div>
+      ${currentTab === "all" ? `<button class="btn btn-primary btn-sm mt3" onclick="go('/search')" type="button">เริ่มหาพื้นที่ขาย</button>` : ""}
+    </div>`;
+    icons(list);
+    return;
+  }
+
+  list.innerHTML = filtered.map(b => {
+    const cfg = STATUS_CONFIG[b.status] || STATUS_CONFIG.PENDING;
+    const startDate = b.startDate || b.date;
+    const endDate   = b.endDate   || b.date;
+    const sameDay = startDate === endDate;
+    return `<div class="card pad mt2">
+      <div class="between mb2">
+        <div>
+          <div class="bold" style="font-size:var(--text-base)">${esc(b.marketName)}</div>
+          <div class="row gap1 muted sub mt1">
+            <i data-lucide="map-pin" style="width:12px;height:12px" aria-hidden="true"></i>
+            ล็อก ${esc(b.lotCode)}
+          </div>
+        </div>
+        <span class="chip" style="background:${cfg.bg};color:${cfg.color};gap:4px">
+          <i data-lucide="${cfg.icon}" style="width:12px;height:12px" aria-hidden="true"></i>
+          ${cfg.label}
+        </span>
+      </div>
+
+      <div class="between sub mb2">
+        <div class="row gap1 muted">
+          <i data-lucide="calendar" style="width:12px;height:12px" aria-hidden="true"></i>
+          ${fmtDate(startDate)}${!sameDay ? " — " + fmtDate(endDate) : ""}
+        </div>
+        <div class="bold" style="color:var(--brand-ink)">${thb(b.depositAmount)} <span class="muted small" style="font-weight:400">มัดจำ</span></div>
+      </div>
+
+      <div class="row gap2">
+        <a href="/market/${b.marketId}" class="btn btn-ghost btn-sm flex1" aria-label="ดูตลาด ${esc(b.marketName)}">
+          <i data-lucide="store" style="width:14px;height:14px"></i>ดูตลาด
+        </a>
+        ${b.status === "PENDING"
+          ? `<a href="/checkout/${b.id}" class="btn btn-primary btn-sm flex1"><i data-lucide="credit-card" style="width:14px;height:14px"></i>ชำระเงิน</a>`
+          : b.status === "CONFIRMED"
+          ? `<button class="btn btn-soft btn-sm flex1" onclick="go('/chat/${b.ownerId}')" type="button"><i data-lucide="message-circle" style="width:14px;height:14px"></i>แชทเจ้าของ</button>`
+          : ""}
+      </div>
+    </div>`;
+  }).join("");
+  icons(list);
+}
+
+async function load() {
+  const list = $("#list");
+  list.innerHTML = skelCards(3);
+  const d = await API.get("/bookings");
+  if (!d.ok) {
+    list.innerHTML = `<div class="card pad center-text muted">เกิดข้อผิดพลาด กรุณารีเฟรช</div>`;
+    return;
+  }
+  allBookings = d.bookings || [];
+  render();
+}
+
+load();
+</script>{% endblock %}

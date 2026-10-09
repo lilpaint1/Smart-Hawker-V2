@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}ผู้ดูแลระบบ — {{ app_name }}{% endblock %}
+{% block sidebar %}{% endblock %}
+{% block shell_class %}shell-bare{% endblock %}
+{% block body %}
+<main class="center" style="min-height:100dvh;background:var(--bg);padding:var(--s5)" id="main-content">
+  <div class="card" style="width:100%;max-width:380px;padding:var(--s8)">
+
+    <div class="center mb5" aria-hidden="true">
+      <div class="center" style="width:60px;height:60px;border-radius:16px;background:#11131a;box-shadow:0 4px 16px rgba(0,0,0,.25)">
+        <i data-lucide="shield-check" style="color:#fff;width:30px;height:30px"></i>
+      </div>
+    </div>
+
+    <h1 class="h2 center-text mb1">เข้าสู่ระบบผู้ดูแล</h1>
+    <p class="muted sub center-text mb5">กรอกรหัสผู้ดูแลระบบเพื่อเข้าใช้งาน</p>
+
+    <div class="form-group mb4">
+      <label class="label" for="code">รหัสผู้ดูแล</label>
+      <input id="code" class="input" type="password" placeholder="••••••••"
+             autocomplete="current-password"
+             onkeydown="if(event.key==='Enter')submitAdmin()"
+             aria-required="true">
+    </div>
+    <div id="err" class="form-err mb3" role="alert" aria-live="polite"></div>
+    <button id="btn-login" class="btn btn-primary btn-block" onclick="submitAdmin()" type="button">
+      <i data-lucide="log-in" style="width:17px;height:17px" aria-hidden="true"></i>
+      เข้าสู่ระบบ
+    </button>
+
+    <p class="center-text muted small mt5">
+      <a href="/" style="color:var(--brand-ink)">← กลับหน้าหลัก</a>
+    </p>
+  </div>
+</main>
+{% endblock %}
+{% block script %}<script>
+async function submitAdmin() {
+  const code  = ($("#code") && $("#code").value) || "";
+  const errEl = $("#err"), btn = $("#btn-login");
+  if (!code) { if (errEl) errEl.textContent = "กรุณากรอกรหัสผู้ดูแล"; return; }
+  setBtnLoading(btn, true);
+  const d = await API.post("/auth/admin", { code });
+  setBtnLoading(btn, false);
+  if (!d.ok) { if (errEl) errEl.textContent = d.error || "รหัสไม่ถูกต้อง"; return; }
+  go("/admin");
+}
+</script>{% endblock %}

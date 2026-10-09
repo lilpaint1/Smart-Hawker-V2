@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+{% block title %}แผนที่ตลาด — {{ app_name }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<style>
+.map-layer-btns {
+  display:flex;gap:8px;flex-wrap:wrap;padding:10px 16px;
+}
+.layer-btn {
+  padding:6px 14px;border-radius:20px;border:1.5px solid var(--line);
+  background:var(--surface);color:var(--ink);font-size:.82rem;cursor:pointer;
+  transition:.15s;font-family:inherit;
+}
+.layer-btn.active {
+  background:var(--brand);color:#fff;border-color:var(--brand);
+}
+.layer-btn.active-teal {
+  background:hsl(168,70%,36%);color:#fff;border-color:hsl(168,70%,36%);
+}
+.layer-btn.active-warn {
+  background:var(--warn,#f59e0b);color:#fff;border-color:var(--warn,#f59e0b);
+}
+.layer-btn.active-traffy {
+  background:#7c3aed;color:#fff;border-color:#7c3aed;
+}
+.density-legend {
+  display:none;padding:8px 16px;gap:16px;font-size:.78rem;
+}
+.density-legend.show { display:flex;flex-wrap:wrap;align-items:center; }
+.legend-dot { width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:4px; }
+
+/* Weather alert banner */
+.weather-banner {
+  display:none;margin:0 16px 8px;border-radius:var(--radius-lg);padding:12px 16px;
+  font-size:.85rem;position:relative;line-height:1.5;
+}
+.weather-banner.show { display:block; }
+.weather-banner.GREEN  { background:hsl(142,50%,93%);border:1px solid hsl(142,50%,75%);color:hsl(142,55%,25%); }
+.weather-banner.YELLOW { background:hsl(38,100%,92%);border:1px solid hsl(38,80%,70%);color:hsl(38,75%,28%); }
+.weather-banner.RED    { background:hsl(0,80%,94%);border:1px solid hsl(0,70%,75%);color:hsl(0,65%,35%); }
+.weather-banner-close { position:absolute;right:10px;top:8px;background:none;border:none;font-size:1.1rem;cursor:pointer;color:inherit;opacity:.6;line-height:1; }
+.weather-banner-alerts { margin-top:6px;display:flex;flex-wrap:wrap;gap:6px; }
+.w-alert-chip { display:inline-block;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:600;background:rgba(0,0,0,.07); }
+</style>
+{% endblock %}
+{% block body %}
+{% with title='แผนที่ตลาด', subtitle='ตลาดทั่วไทย — แตะหมุดเพื่อดูรายละเอียด' %}{% include "_appheader.html" %}{% endwith %}
+
+{# Weather alert banner #}
+<div id="weather-banner" class="weather-banner">
+  <button class="weather-banner-close" onclick="document.getElementById('weather-banner').classList.remove('show')" type="button">✕</button>
+  <strong id="wb-title">—</strong>
+  <div class="weather-banner-alerts" id="wb-alerts"></div>
+</div>
+
+<div class="map-layer-btns">
+  <button class="layer-btn active" id="btn-lots" onclick="setLayer('lots')">ล็อกว่าง</button>
+  <button class="layer-btn" id="btn-density" onclick="setLayer('density')">ความหนาแน่น</button>
+  <button class="layer-btn" id="btn-complaints" onclick="setLayer('complaints')">ร้องเรียน</button>
+  <button class="layer-btn" id="btn-traffy" onclick="setLayer('traffy')">
+    🟣 Traffy Fondue
+  </button>
+</div>
+<div class="density-legend" id="density-legend">
+  <span><span class="legend-dot" style="background:#22c55e"></span>ความจุต่ำ (GREEN)</span>
+  <span><span class="legend-dot" style="background:#f59e0b"></span>ความจุปานกลาง (YELLOW)</span>
+  <span><span class="legend-dot" style="background:#ef4444"></span>ความจุสูง (RED)</span>
+</div>
+<div class="density-legend" id="traffy-legend">
+  <span><span class="legend-dot" style="background:#7c3aed"></span>ทางเท้า</span>
+  <span><span class="legend-dot" style="background:#ef4444"></span>ความสะอาด</span>
+  <span><span class="legend-dot" style="background:#f59e0b"></span>การจราจร</span>
+  <span><span class="legend-dot" style="background:#6b7280"></span>อื่นๆ</span>
+  <span style="margin-left:auto;color:var(--ink-soft);font-size:.72rem">แหล่งข้อมูล: Traffy Fondue</span>
+</div>
+
+<div class="px">
+  <div id="map" class="map-box" style="height:calc(100dvh - 240px);min-height:400px"></div>
+</div>
+{% with active='map' %}{% include "_bottomnav.html" %}{% endwith %}
+{% endblock %}
+{% block script %}<script>
+const map = L.map("map").setView([13.74, 100.56], 10);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map);
+
+const cluster = L.markerClusterGroup({ disableClusteringAtZoom: 13 });
+map.addLayer(cluster);
+
+let allMarkets = [];
+let zoneCircles = [];
+let currentLayer = "lots";
+
+const DENSITY_COLOR = { GREEN: "#22c55e", YELLOW: "#f59e0b", RED: "#ef4444" };
+
+function clearZoneCircles() {
+  zoneCircles.forEach(c => map.removeLayer(c));
+  zoneCircles = [];
+}
+
+function renderLots() {
+  clearZoneCircles();
+  cluster.clearLayers();
+  allMarkets.forEach(m => {
+    const popup = `<b>${esc(m.name)}</b><br>`
+      + `<span style="color:#6b7280;font-size:12px">${esc(m.district||"")}, ${esc(m.province)}</span>`
+      + `<br><span style="font-size:13px">ว่าง <b style="color:${m.availableLots ? "#0d9488":"#dc2626"}">${m.availableLots}</b>/${m.totalLots} ล็อก · ${m.minPrice ? thb(m.minPrice)+"/วัน":"เต็ม"}</span>`
+      + (m.avgRating ? `<br>${stars(m.avgRating, 12)} <span style="font-size:11px;color:#6b7280">${m.avgRating}</span>` : "")
+      + `<br><a href="/market/${m.id}" style="color:var(--brand-ink);font-weight:700;font-size:13px">ดูรายละเอียด →</a>`;
+    L.marker([m.lat, m.lng]).addTo(cluster).bindPopup(popup);
+  });
+}
+
+function renderDensity(zones) {
+  clearZoneCircles();
+  cluster.clearLayers();
+  const zoneMap = {};
+  zones.forEach(z => { zoneMap[z.marketId] = z; });
+
+  allMarkets.forEach(m => {
+    const z = zoneMap[m.id];
+    const color = z ? DENSITY_COLOR[z.densityLevel] || "#22c55e" : "#94a3b8";
+    const radius = z ? Math.max(200, z.maxCapacity * 15) : 200;
+    const pct = z ? Math.round((z.currentLots / z.maxCapacity) * 100) : 0;
+    const circle = L.circle([m.lat, m.lng], {
+      color: color,
+      fillColor: color,
+      fillOpacity: 0.25,
+      weight: 2,
+      radius: radius,
+    }).addTo(map);
+    const popupHtml = `<b>${esc(m.name)}</b><br>`
+      + (z ? `<span style="font-size:12px;color:#6b7280">เขต ${esc(z.sidewalkWidth||"")?.toString() ? z.sidewalkWidth+"m ทางเท้า" : ""}</span><br>`
+           + `<span style="font-size:13px">ความจุ <b>${z.currentLots}/${z.maxCapacity}</b> (${pct}%)</span><br>`
+           + `<span style="font-size:13px">ร้องเรียน <b>${z.complaints}</b> เรื่อง</span><br>`
+           + (z.traffyIssues ? `<span style="font-size:12px;color:#f59e0b">Traffy ${z.traffyIssues} เรื่องใน 200m</span><br>` : "")
+           + (z.note ? `<span style="font-size:11px;color:#6b7280">${esc(z.note)}</span><br>` : "")
+           : `<span style="font-size:12px;color:#94a3b8">ยังไม่มีข้อมูลโซน</span><br>`)
+      + `<a href="/market/${m.id}" style="color:var(--brand-ink);font-weight:700;font-size:13px">ดูรายละเอียด →</a>`;
+    circle.bindPopup(popupHtml);
+    zoneCircles.push(circle);
+
+    // also add a small marker
+    L.marker([m.lat, m.lng]).addTo(cluster).bindPopup(popupHtml);
+  });
+}
+
+function renderComplaints(zones) {
+  clearZoneCircles();
+  cluster.clearLayers();
+  const zoneMap = {};
+  zones.forEach(z => { zoneMap[z.marketId] = z; });
+
+  allMarkets.forEach(m => {
+    const z = zoneMap[m.id];
+    const complaints = z ? z.complaints : 0;
+    const color = complaints >= 5 ? "#ef4444" : complaints >= 2 ? "#f59e0b" : "#22c55e";
+    const radius = Math.max(150, complaints * 60 + 150);
+    const circle = L.circle([m.lat, m.lng], {
+      color: color, fillColor: color, fillOpacity: 0.2, weight: 2, radius: radius,
+    }).addTo(map);
+    const popupHtml = `<b>${esc(m.name)}</b><br>`
+      + `<span style="font-size:13px">ร้องเรียน <b style="color:${color}">${complaints}</b> เรื่อง</span><br>`
+      + (z && z.traffyIssues ? `<span style="font-size:12px;color:#f59e0b">Traffy ${z.traffyIssues} เรื่องใน 200m</span><br>` : "")
+      + `<a href="/market/${m.id}" style="color:var(--brand-ink);font-weight:700;font-size:13px">ดูรายละเอียด →</a>`;
+    circle.bindPopup(popupHtml);
+    zoneCircles.push(circle);
+    L.marker([m.lat, m.lng]).addTo(cluster).bindPopup(popupHtml);
+  });
+}
+
+let cachedZones   = null;
+let cachedTraffy  = null;
+let traffyCircles = [];
+
+const TRAFFY_TYPE_COLOR = {
+  "ทางเท้า":   "#7c3aed",
+  "ความสะอาด": "#ef4444",
+  "การจราจร":  "#f59e0b",
+  "เสียง":     "#0ea5e9",
+};
+
+function traffyColor(type) {
+  return TRAFFY_TYPE_COLOR[type] || "#6b7280";
+}
+
+function clearTraffyCircles() {
+  traffyCircles.forEach(c => map.removeLayer(c));
+  traffyCircles = [];
+}
+
+function renderTraffy(complaints) {
+  clearZoneCircles();
+  clearTraffyCircles();
+  cluster.clearLayers();
+
+  if (!complaints || !complaints.length) {
+    map.openPopup(
+      L.popup().setLatLng(map.getCenter())
+        .setContent('<div style="padding:8px;text-align:center">ไม่พบเรื่องร้องเรียนในพื้นที่ตลาด</div>'),
+    );
+    return;
+  }
+
+  complaints.forEach(c => {
+    const color  = traffyColor(c.type);
+    const circle = L.circleMarker([c.lat, c.lng], {
+      radius: 8, color: color, fillColor: color,
+      fillOpacity: 0.6, weight: 2,
+    }).addTo(map);
+    circle.bindPopup(
+      `<div style="max-width:220px">
+        <span style="display:inline-block;background:${color};color:#fff;padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700">${esc(c.type)}</span>
+        ${c.marketName ? `<br><span style="font-size:.78rem;color:#6b7280">${esc(c.marketName)}</span>` : ""}
+        <br><span style="font-size:.85rem;margin-top:4px;display:block">${esc(c.desc)}</span>
+        <span style="font-size:.75rem;color:#9ca3af">${c.date || ""} ${c.source === "mock" ? "· mock data" : ""}</span>
+       </div>`,
+    );
+    traffyCircles.push(circle);
+  });
+}
+
+async function getZones() {
+  if (cachedZones) return cachedZones;
+  const d = await API.get("/zones");
+  cachedZones = d.ok ? (d.zones || []) : [];
+  return cachedZones;
+}
+
+async function getTraffy() {
+  if (cachedTraffy) return cachedTraffy;
+  const d = await API.get("/traffy/all");
+  cachedTraffy = d.ok ? (d.complaints || []) : [];
+  return cachedTraffy;
+}
+
+async function setLayer(layer) {
+  currentLayer = layer;
+  document.querySelectorAll(".layer-btn").forEach(b => { b.className = "layer-btn"; });
+  document.getElementById("density-legend").classList.remove("show");
+  document.getElementById("traffy-legend").classList.remove("show");
+  clearTraffyCircles();
+
+  if (layer === "lots") {
+    document.getElementById("btn-lots").classList.add("active");
+    renderLots();
+  } else if (layer === "density") {
+    document.getElementById("btn-density").classList.add("active-teal");
+    document.getElementById("density-legend").classList.add("show");
+    const zones = await getZones();
+    renderDensity(zones);
+  } else if (layer === "complaints") {
+    document.getElementById("btn-complaints").classList.add("active-warn");
+    const zones = await getZones();
+    renderComplaints(zones);
+  } else if (layer === "traffy") {
+    document.getElementById("btn-traffy").classList.add("active-traffy");
+    document.getElementById("traffy-legend").classList.add("show");
+    const complaints = await getTraffy();
+    renderTraffy(complaints);
+  }
+}
+
+// Weather alert banner
+async function loadWeatherBanner() {
+  const center = map.getCenter();
+  const d = await API.get(`/weather/alerts?lat=${center.lat.toFixed(4)}&lng=${center.lng.toFixed(4)}`);
+  if (!d.ok) return;
+  const banner = document.getElementById("weather-banner");
+  banner.className = `weather-banner show ${d.overall}`;
+  const icons = { GREEN: "☀️", YELLOW: "⚠️", RED: "🚨" };
+  document.getElementById("wb-title").textContent =
+    `${icons[d.overall] || "ℹ️"} สภาพอากาศ: ${d.weather ? d.weather.temp_c + "°C รู้สึก " + d.weather.feels_like + "°C" : "—"} · PM2.5 ${d.aqi ? d.aqi.pm25 : "—"} µg/m³`;
+  document.getElementById("wb-alerts").innerHTML = (d.alerts || [])
+    .map(a => `<span class="w-alert-chip">${a.msg}</span>`).join("");
+}
+
+// Initial load
+API.get("/markets").then(d => {
+  allMarkets = d.markets || [];
+  renderLots();
+  loadWeatherBanner();
+});
+</script>{% endblock %}

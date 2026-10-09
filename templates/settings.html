@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}การตั้งค่า — {{ app_name }}{% endblock %}
+{% block body %}
+<div class="topbar">
+  <button class="back" onclick="history.back()" aria-label="กลับ" type="button">
+    <i data-lucide="chevron-left" aria-hidden="true"></i>
+  </button>
+  <h1>การตั้งค่า</h1>
+</div>
+
+<main class="page-pad" id="main-content">
+
+  {# Theme #}
+  <div class="card pad mb3">
+    <div class="label mb3">ธีมการแสดงผล</div>
+    <div class="row gap3">
+      <button class="role-card flex1" id="theme-light" onclick="setThemeUI('light')" type="button" aria-pressed="false">
+        <i data-lucide="sun" aria-hidden="true"></i>
+        <span class="bold">สว่าง</span>
+      </button>
+      <button class="role-card flex1" id="theme-dark" onclick="setThemeUI('dark')" type="button" aria-pressed="false">
+        <i data-lucide="moon" aria-hidden="true"></i>
+        <span class="bold">มืด</span>
+      </button>
+    </div>
+  </div>
+
+  {# Accent color #}
+  <div class="card pad mb3">
+    <div class="label mb3">สีหลัก</div>
+    <div class="row gap2 flex-wrap" id="accent-swatches" role="radiogroup" aria-label="เลือกสีหลัก"></div>
+  </div>
+
+  {# Senior mode #}
+  <div class="card pad mb3">
+    <div class="between">
+      <div>
+        <div class="bold sub">โหมดผู้สูงอายุ</div>
+        <div class="muted small mt1">ขยายตัวอักษร เพิ่มระยะห่าง</div>
+      </div>
+      <button id="senior-toggle" class="toggle-btn" onclick="toggleSenior()" type="button" role="switch"
+              aria-checked="false" aria-label="เปิด/ปิดโหมดผู้สูงอายุ"
+              style="width:48px;height:26px;border-radius:13px;border:none;position:relative;cursor:pointer;transition:background .2s">
+        <span id="senior-knob" style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.2)"></span>
+      </button>
+    </div>
+  </div>
+
+  {# Language #}
+  <div class="card pad mb3">
+    <div class="label mb3">ภาษา / Language</div>
+    <div class="grid2 gap2">
+      <button class="role-card" id="lang-th" onclick="setLangUI('th')" type="button" aria-pressed="true">
+        <span style="font-size:1.5rem">🇹🇭</span>
+        <span class="bold">ภาษาไทย</span>
+      </button>
+      <button class="role-card" id="lang-en" onclick="setLangUI('en')" type="button" aria-pressed="false">
+        <span style="font-size:1.5rem">🇺🇸</span>
+        <span class="bold">English</span>
+      </button>
+    </div>
+  </div>
+
+  {# Danger zone #}
+  <div class="card pad mb3" style="border-color:var(--danger);border-width:1.5px">
+    <div class="label mb2" style="color:var(--danger-ink)">โซนอันตราย</div>
+    <div class="muted small mb3">การลบบัญชีจะลบข้อมูลทั้งหมดของคุณอย่างถาวรและไม่สามารถกู้คืนได้</div>
+    <button class="btn btn-danger btn-block" onclick="deleteAccount()" type="button">
+      <i data-lucide="trash-2" style="width:16px;height:16px" aria-hidden="true"></i>
+      ลบบัญชีของฉัน
+    </button>
+  </div>
+
+</main>
+
+{% with active='profile' %}{% include "_bottomnav.html" %}{% endwith %}
+{% endblock %}
+{% block script %}<script>
+// ---- Theme ----
+function setThemeUI(t) {
+  THEME.set(t);
+  updateThemeBtns();
+}
+function updateThemeBtns() {
+  const cur = THEME.current();
+  for (const t of ["light","dark"]) {
+    const btn = document.getElementById("theme-" + t);
+    if (btn) {
+      btn.classList.toggle("selected", t === cur);
+      btn.setAttribute("aria-pressed", t === cur ? "true" : "false");
+    }
+  }
+}
+
+// ---- Accent ----
+function buildAccentSwatches() {
+  const wrap = $("#accent-swatches"); if (!wrap) return;
+  const cur = THEME.currentAccent ? THEME.currentAccent() : "amber";
+  wrap.innerHTML = THEME.accentList.map(key => {
+    const info = THEME.accents[key];
+    const hsl = `hsl(${info.h},${info.s},52%)`;
+    return `<button class="accent-swatch${key === cur ? " active" : ""}" onclick="setAccentUI('${key}')" type="button"
+              role="radio" aria-checked="${key === cur ? "true" : "false"}" aria-label="สี ${esc(info.label || key)}"
+              style="--swatch-color:${hsl}" title="${esc(info.label || key)}"></button>`;
+  }).join("");
+}
+function setAccentUI(key) {
+  THEME.setAccent(key);
+  buildAccentSwatches();
+}
+
+// ---- Senior ----
+function toggleSenior() {
+  const isOn = THEME.isSenior ? THEME.isSenior() : false;
+  THEME.setSenior(!isOn);
+  updateSeniorBtn();
+}
+function updateSeniorBtn() {
+  const isOn = THEME.isSenior ? THEME.isSenior() : false;
+  const btn   = $("#senior-toggle"), knob = $("#senior-knob");
+  if (btn) {
+    btn.style.background = isOn ? "var(--brand)" : "var(--line)";
+    btn.setAttribute("aria-checked", isOn ? "true" : "false");
+  }
+  if (knob) knob.style.transform = isOn ? "translateX(22px)" : "translateX(0)";
+}
+
+// ---- Language ----
+function setLangUI(lang) {
+  THEME.setLang(lang);
+  updateLangBtns();
+}
+function updateLangBtns() {
+  const cur = THEME.currentLang ? THEME.currentLang() : "th";
+  for (const l of ["th","en"]) {
+    const btn = document.getElementById("lang-" + l);
+    if (btn) {
+      btn.classList.toggle("selected", l === cur);
+      btn.setAttribute("aria-pressed", l === cur ? "true" : "false");
+    }
+  }
+}
+
+// ---- Delete account ----
+async function deleteAccount() {
+  if (!confirm("คุณแน่ใจหรือไม่? บัญชีและข้อมูลทั้งหมดจะถูกลบอย่างถาวร")) return;
+  if (!confirm("ยืนยันอีกครั้ง: ลบบัญชีและข้อมูลทั้งหมดของฉัน")) return;
+  const d = await API.del("/me");
+  if (!d.ok) { Toast.error(d.error || "เกิดข้อผิดพลาด"); return; }
+  Toast.success("ลบบัญชีสำเร็จ");
+  setTimeout(() => go("/"), 1000);
+}
+
+// Init
+document.addEventListener("DOMContentLoaded", () => {
+  updateThemeBtns();
+  buildAccentSwatches();
+  updateSeniorBtn();
+  updateLangBtns();
+  icons();
+});
+</script>{% endblock %}

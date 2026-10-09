@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}โปรไฟล์ — {{ app_name }}{% endblock %}
+{% block body %}
+{% with title='โปรไฟล์ของฉัน' %}{% include "_appheader.html" %}{% endwith %}
+
+<div class="page-pad" id="main-content">
+  <div class="skeleton" style="height:200px;border-radius:var(--radius-lg)"></div>
+</div>
+
+{% with active='profile' %}{% include "_bottomnav.html" %}{% endwith %}
+{% endblock %}
+{% block script %}<script>
+let user = null, editMode = false;
+
+function field(k, v) {
+  return `<div style="padding:.4rem 0;border-bottom:1px solid var(--line)">
+    <div class="ghost" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">${k}</div>
+    <div class="sub mt1">${esc(v || "—")}</div>
+  </div>`;
+}
+
+async function load() {
+  const wrap = $("#main-content");
+  const d = await API.get("/me");
+  if (!d.ok || !d.user) { go("/login?next=/profile"); return; }
+  user = d.user;
+  try {
+    render(wrap);
+  } catch(e) {
+    wrap.innerHTML = `<div class="card pad center-text" style="margin-top:40px">
+      <i data-lucide="alert-circle" style="width:40px;height:40px;color:var(--danger);margin-bottom:16px;display:block;margin-left:auto;margin-right:auto"></i>
+      <div class="bold mb3">โหลดโปรไฟล์ไม่สำเร็จ</div>
+      <button class="btn btn-primary btn-sm" onclick="load()" type="button">ลองใหม่</button>
+    </div>`;
+    icons(wrap);
+  }
+}
+
+function render(wrap) {
+  const isSeller = user.role === "SELLER";
+  const isOwner  = user.role === "MARKET_OWNER";
+  const bgColor  = avaColor(user.name);
+  const roleIcon = isOwner ? "building-2" : "store";
+
+  wrap.innerHTML = `
+    {# Avatar + name #}
+    <div class="col center-text" style="align-items:center;padding:var(--s6) 0 var(--s4)">
+      <div class="avatar" style="width:88px;height:88px;background:${bgColor};font-size:2rem;position:relative">
+        ${esc(user.name.charAt(0))}
+        ${user.is_verified ? `<span style="position:absolute;bottom:-4px;right:-4px;background:var(--brand);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)"><i data-lucide="check" style="width:12px;height:12px;color:#fff"></i></span>` : ""}
+      </div>
+      <h2 class="h2 mt3 mb1">${esc(user.name)}</h2>
+      <span class="chip" style="gap:4px">
+        <i data-lucide="${roleIcon}" style="width:12px;height:12px" aria-hidden="true"></i>
+        ${esc(C.ROLE_LABEL[user.role] || user.role)}
+      </span>
+      <div class="row gap1 muted sub mt2">
+        <i data-lucide="phone" style="width:13px;height:13px" aria-hidden="true"></i>
+        ${esc(user.phone)}
+      </div>
+      ${user.email ? `<div class="row gap1 muted sub mt1"><i data-lucide="mail" style="width:13px;height:13px" aria-hidden="true"></i>${esc(user.email)}</div>` : ""}
+      ${user.is_suspended ? `<div class="chip chip-danger mt2">บัญชีถูกระงับ</div>` : ""}
+    </div>
+
+    ${isSeller ? shopSection() : ""}
+    ${isOwner  ? ownerLinks() : ""}
+
+    ${kycCard()}
+
+    <div class="card pad mt4">
+      <div class="label mb2">บัญชีและการตั้งค่า</div>
+      <a href="/settings" class="row gap3 pad" style="text-decoration:none;color:var(--ink);border-radius:var(--radius-lg)">
+        <i data-lucide="settings" style="width:18px;height:18px;color:var(--ink-soft)"></i>
+        <span class="sub flex1">การตั้งค่า</span>
+        <i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--ink-ghost)"></i>
+      </a>
+      <a href="/favorites" class="row gap3 pad" style="text-decoration:none;color:var(--ink);border-radius:var(--radius-lg)">
+        <i data-lucide="heart" style="width:18px;height:18px;color:var(--danger)"></i>
+        <span class="sub flex1">ตลาดที่บันทึกไว้</span>
+        <i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--ink-ghost)"></i>
+      </a>
+      <a href="/notifications" class="row gap3 pad" style="text-decoration:none;color:var(--ink);border-radius:var(--radius-lg)">
+        <i data-lucide="bell" style="width:18px;height:18px;color:var(--brand)"></i>
+        <span class="sub flex1">การแจ้งเตือน</span>
+        <i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--ink-ghost)"></i>
+      </a>
+    </div>
+
+    <button class="btn btn-danger btn-block mt4" onclick="logout()" type="button">
+      <i data-lucide="log-out" style="width:16px;height:16px" aria-hidden="true"></i>
+      ออกจากระบบ
+    </button>
+  `;
+  icons(wrap);
+}
+
+function shopSection() {
+  return `
+    <div class="card pad mt2">
+      <div class="between mb3">
+        <div class="label">ข้อมูลร้านค้า</div>
+        <button class="btn btn-soft btn-sm" onclick="toggleEdit()" id="edit-btn" type="button">แก้ไข</button>
+      </div>
+
+      <div id="shop-view">
+        ${field("ชื่อร้าน", user.shopName)}
+        ${field("ประเภทสินค้า", user.productType)}
+        ${field("เกี่ยวกับร้าน", user.bio)}
+      </div>
+
+      <div id="shop-edit" class="hide">
+        <div class="col gap3">
+          <div class="form-group">
+            <label class="label" for="f-shop">ชื่อร้าน</label>
+            <input id="f-shop" class="input" value="${esc(user.shopName || "")}">
+          </div>
+          <div class="form-group">
+            <label class="label" for="f-type">ประเภทสินค้า</label>
+            <input id="f-type" class="input" value="${esc(user.productType || "")}" placeholder="เช่น อาหาร, เสื้อผ้า, ของสด">
+          </div>
+          <div class="form-group">
+            <label class="label" for="f-bio">เกี่ยวกับร้าน</label>
+            <textarea id="f-bio" class="input" rows="3">${esc(user.bio || "")}</textarea>
+          </div>
+          <div id="save-err" class="form-err" role="alert" aria-live="polite"></div>
+          <div class="row gap2">
+            <button class="btn btn-ghost flex1" onclick="toggleEdit()" type="button">ยกเลิก</button>
+            <button id="btn-save" class="btn btn-primary flex1" onclick="saveProfile()" type="button">
+              <i data-lucide="save" style="width:15px;height:15px" aria-hidden="true"></i>บันทึก
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function kycCard() {
+  const vs     = user.verificationStatus || "UNVERIFIED";
+  const labels = { UNVERIFIED: "ยังไม่ยืนยัน", PENDING: "รอการยืนยัน", VERIFIED: "ยืนยันแล้ว", REJECTED: "ถูกปฏิเสธ" };
+  const colors = { UNVERIFIED: "var(--ink-ghost)", PENDING: "var(--warn-ink)", VERIFIED: "var(--success-ink)", REJECTED: "var(--danger-ink)" };
+  const bgMap  = { UNVERIFIED: "var(--bg-2)", PENDING: "var(--warn-soft)", VERIFIED: "var(--success-soft)", REJECTED: "var(--danger-soft)" };
+  return `<div class="card pad mt2">
+    <div class="row gap3 align-center">
+      <div style="width:42px;height:42px;border-radius:11px;background:${bgMap[vs]||"var(--bg-2)"};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i data-lucide="${vs === "VERIFIED" ? "badge-check" : "fingerprint"}"
+           style="width:20px;height:20px;color:${colors[vs]||"var(--ink-ghost)"}" aria-hidden="true"></i>
+      </div>
+      <div class="flex1">
+        <div class="bold">ยืนยันตัวตน (e-KYC)</div>
+        <div class="muted sub" style="color:${colors[vs]||"var(--ink-ghost)"}">${labels[vs]||vs}</div>
+      </div>
+      ${vs !== "VERIFIED"
+        ? `<button class="btn btn-soft btn-sm" onclick="startKyc()" type="button">ยืนยันตัวตน</button>`
+        : `<span class="chip" style="background:var(--success-soft);color:var(--success-ink);font-size:.72rem">ยืนยันแล้ว</span>`}
+    </div>
+  </div>`;
+}
+
+function ownerLinks() {
+  return `
+    <div class="card pad mt2">
+      <a href="/owner" class="row gap3 pad" style="text-decoration:none;color:var(--ink);border-radius:var(--radius-lg)">
+        <i data-lucide="store" style="width:18px;height:18px;color:var(--brand)"></i>
+        <span class="sub flex1">จัดการตลาดของฉัน</span>
+        <i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--ink-ghost)"></i>
+      </a>
+    </div>`;
+}
+
+function toggleEdit() {
+  editMode = !editMode;
+  const sv = $("#shop-view"), se = $("#shop-edit"), btn = $("#edit-btn");
+  if (sv) sv.classList.toggle("hide", editMode);
+  if (se) se.classList.toggle("hide", !editMode);
+  if (btn) btn.textContent = editMode ? "ยกเลิก" : "แก้ไข";
+}
+
+async function saveProfile() {
+  const shopName   = ($("#f-shop") && $("#f-shop").value.trim()) || "";
+  const productType= ($("#f-type") && $("#f-type").value.trim()) || "";
+  const bio        = ($("#f-bio")  && $("#f-bio").value.trim())  || "";
+  const btn        = $("#btn-save");
+  const err        = $("#save-err");
+  setBtnLoading(btn, true);
+  const d = await API.post("/profile", { shopName, productType, bio });
+  setBtnLoading(btn, false);
+  if (!d.ok) { if (err) err.textContent = d.error || "เกิดข้อผิดพลาด"; return; }
+  Toast.success("บันทึกข้อมูลแล้ว");
+  user.shopName = shopName; user.productType = productType; user.bio = bio;
+  editMode = false;
+  load();
+}
+
+async function startKyc() {
+  const d = await API.post("/identity/start");
+  if (!d.ok) { Toast.error(d.error || "เริ่มยืนยันตัวตนไม่ได้"); return; }
+  if (d.redirectUrl) go(d.redirectUrl);
+}
+
+load();
+</script>{% endblock %}

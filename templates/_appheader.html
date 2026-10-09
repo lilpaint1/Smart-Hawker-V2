@@ -1,0 +1,23 @@
+{# _appheader.html — Big title + notification bell
+   ส่ง: title (required), subtitle (optional)
+   Bell badge อัปเดตโดย refreshBell() ใน app.js
+#}
+<header class="app-header" role="banner">
+  <div class="title-wrap">
+    <div class="h2" style="font-size:var(--text-2xl)">{{ title }}</div>
+    {% if subtitle %}<div class="muted sub mt1">{{ subtitle }}</div>{% endif %}
+  </div>
+  <div class="row gap2" style="align-items:center;flex-shrink:0">
+    {% if me %}
+    <a href="/profile" class="header-avatar" aria-label="โปรไฟล์: {{ me.name }}" title="{{ me.name }}">
+      {{ me.name[0]|upper }}
+    </a>
+    {% elif not session_role %}
+    <a href="/login" class="btn btn-ghost btn-sm" style="white-space:nowrap">เข้าสู่ระบบ</a>
+    {% endif %}
+    <a href="/notifications" class="bell card card-press" aria-label="การแจ้งเตือน" style="position:relative">
+      <i data-lucide="bell" aria-hidden="true"></i>
+      <span id="bell-badge" class="badge-dot hide" aria-label="มีการแจ้งเตือนใหม่"></span>
+    </a>
+  </div>
+</header>

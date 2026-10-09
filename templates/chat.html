@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}แชท — {{ app_name }}{% endblock %}
+{% block body %}
+{% with title='แชท', subtitle='บทสนทนาทั้งหมดของคุณ' %}{% include "_appheader.html" %}{% endwith %}
+<div class="page-pad" id="list"></div>
+{% with active='chat' %}{% include "_bottomnav.html" %}{% endwith %}
+{% endblock %}
+{% block script %}<script>
+async function load() {
+  const list = $("#list");
+  list.innerHTML = skelCards(4);
+  const d = await API.get("/messages");
+  if (!d.ok || !d.threads || !d.threads.length) {
+    list.innerHTML = `<div class="card pad center-text muted mt2">
+      <i data-lucide="message-circle" style="width:48px;height:48px;color:var(--ink-ghost)"></i>
+      <div class="h3 mt3">ยังไม่มีบทสนทนา</div>
+      <div class="small mt1">เริ่มแชทได้จากหน้ารายละเอียดตลาด</div>
+      <a href="/search" class="btn btn-primary btn-sm mt4">ค้นหาตลาด</a>
+    </div>`;
+    icons(list);
+    return;
+  }
+
+  list.innerHTML = d.threads.map(t => {
+    const initials = (t.otherName || "?").charAt(0).toUpperCase();
+    const bg = avaColor(t.otherName || "user");
+    const unread = t.unreadCount > 0;
+    return `<a class="card card-press pad row gap3 mt2" href="/chat/${t.otherId}"
+               aria-label="แชทกับ ${esc(t.otherName)}${unread ? " — มีข้อความใหม่ " + t.unreadCount + " ข้อความ" : ""}"
+               style="position:relative">
+      <div class="avatar" style="width:48px;height:48px;background:${bg};font-size:1.2rem;flex-shrink:0" aria-hidden="true">
+        ${initials}
+        ${unread ? `<span class="badge-dot" aria-hidden="true"></span>` : ""}
+      </div>
+      <div class="flex1" style="min-width:0">
+        <div class="between">
+          <div class="bold truncate">${esc(t.otherName)}</div>
+          <div class="ghost" style="font-size:.7rem;white-space:nowrap">${t.lastAt ? fmtTime(t.lastAt) : ""}</div>
+        </div>
+        <div class="row gap1 mt1">
+          <div class="muted sub truncate flex1">${esc(t.lastBody || "")}</div>
+          ${unread ? `<span style="min-width:18px;height:18px;background:var(--brand);color:#fff;border-radius:9px;font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;flex-shrink:0">${t.unreadCount}</span>` : ""}
+        </div>
+      </div>
+    </a>`;
+  }).join("");
+  icons(list);
+}
+
+load();
+</script>{% endblock %}

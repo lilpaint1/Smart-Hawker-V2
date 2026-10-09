@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}เข้าสู่ระบบ — {{ app_name }}{% endblock %}
+{% block sidebar %}{% endblock %}{# ไม่ต้องการ sidebar ในหน้า auth #}
+{% block shell_class %}shell-bare{% endblock %}
+{% block body %}
+<main class="center" style="min-height:100dvh;background:var(--bg);padding:var(--s5)" id="main-content">
+  <div class="card" style="width:100%;max-width:400px;padding:var(--s8)">
+
+    {# Brand mark #}
+    <div class="center mb6">
+      <a href="/" aria-label="{{ app_name }} — หน้าแรก">
+        <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="{{ app_name }}" width="52" height="52" style="width:52px;height:52px;display:block">
+      </a>
+    </div>
+
+    {# Step 1: Phone #}
+    <div id="step-phone">
+      <h1 class="h2 mb1">ยินดีต้อนรับกลับ</h1>
+      <p class="muted sub mb5">กรอกเบอร์โทรเพื่อรับรหัส OTP</p>
+
+      <div class="form-group mb4">
+        <label class="label" for="phone">เบอร์โทรศัพท์</label>
+        <input id="phone" class="input" inputmode="numeric" maxlength="10"
+               placeholder="08X-XXX-XXXX" autocomplete="tel" enterkeyhint="go"
+               onkeydown="if(event.key==='Enter')requestOtp()">
+      </div>
+      <div id="err1" class="form-err" role="alert" aria-live="polite"></div>
+      <button id="btn-otp" class="btn btn-primary btn-block mt3" onclick="requestOtp()" type="button">
+        ขอรหัส OTP
+      </button>
+      <p class="center-text muted sub mt4">
+        ยังไม่มีบัญชี? <a href="/register" style="color:var(--brand-ink);font-weight:700">สมัครสมาชิก</a>
+      </p>
+      {% include "_quicklogin.html" %}
+    </div>
+
+    {# Step 2: OTP #}
+    <div id="step-otp" class="hide">
+      <h1 class="h2 mb1">กรอกรหัส OTP</h1>
+      <p class="muted sub mb2">ส่งรหัสไปที่ <span id="phone-show" class="bold" style="color:var(--ink)"></span></p>
+
+      {# Dev mode OTP display #}
+      <div id="devbox" class="card pad mb4 hide" style="background:var(--success-soft);border-color:var(--success)">
+        <div class="row gap2">
+          <i data-lucide="key" style="width:16px;color:var(--success-ink)"></i>
+          <span class="small bold" style="color:var(--success-ink)">โหมดทดสอบ — รหัส OTP คือ <b id="devcode"></b></span>
+        </div>
+      </div>
+
+      {# 6 OTP cells with auto-advance #}
+      <div class="otp-cells mb2" id="otp-cells" aria-label="กรอกรหัส OTP 6 หลัก">
+        {% for i in range(6) %}
+        <input class="otp-cell" type="text" inputmode="numeric" maxlength="1"
+               pattern="[0-9]" aria-label="หลักที่ {{ i+1 }}" autocomplete="{% if i==0 %}one-time-code{% else %}off{% endif %}"
+               data-idx="{{ i }}">
+        {% endfor %}
+      </div>
+      <div id="err2" class="form-err" role="alert" aria-live="polite"></div>
+
+      <button id="btn-verify" class="btn btn-primary btn-block mt3" onclick="verifyOtp()" type="button">
+        ยืนยัน
+      </button>
+
+      {# Resend timer #}
+      <div class="center mt3 gap2">
+        <button id="btn-resend" class="btn btn-ghost btn-sm" onclick="requestOtp(true)" type="button" disabled style="min-height:0">
+          ส่งรหัสอีกครั้ง (<span id="resend-timer">60</span>s)
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="backToPhone()" type="button" style="min-height:0">เปลี่ยนเบอร์</button>
+      </div>
+    </div>
+
+  </div>
+</main>
+{% endblock %}
+{% block script %}<script>
+let resendInterval;
+
+function startResendTimer() {
+  let sec = 60;
+  const btn = $("#btn-resend"), span = $("#resend-timer");
+  btn.disabled = true;
+  clearInterval(resendInterval);
+  resendInterval = setInterval(() => {
+    sec--;
+    if (span) span.textContent = sec;
+    if (sec <= 0) {
+      clearInterval(resendInterval);
+      if (btn) { btn.disabled = false; btn.innerHTML = "ส่งรหัสอีกครั้ง"; }
+    }
+  }, 1000);
+}
+
+async function requestOtp(isResend) {
+  const phone = ($("#phone").value || "").replace(/\D/g, "");
+  if (phone.length !== 10) { $("#err1").textContent = "เบอร์ต้องเป็นตัวเลข 10 หลัก"; return; }
+  $("#err1").textContent = "";
+  const btn = isResend ? $("#btn-resend") : $("#btn-otp");
+  setBtnLoading(btn, true);
+  const d = await API.post("/auth/otp/request", { phone });
+  setBtnLoading(btn, false);
+  if (!d.ok) {
+    const errEl = isResend ? $("#err2") : $("#err1");
+    if (!isResend && (d.error || "").includes("ไม่พบ")) {
+      errEl.innerHTML = esc(d.error) + ' &mdash; <a href="/register" style="color:var(--brand-ink);font-weight:700">สมัครสมาชิก →</a>';
+    } else {
+      errEl.textContent = d.error;
+    }
+    return;
+  }
+  if (!isResend) {
+    $("#phone-show").textContent = phone;
+    if (d.dev) { $("#devcode").textContent = d.dev; $("#devbox").classList.remove("hide"); }
+    $("#step-phone").classList.add("hide");
+    $("#step-otp").classList.remove("hide");
+    // focus first OTP cell
+    const cells = $$(".otp-cell");
+    if (cells[0]) cells[0].focus();
+  }
+  startResendTimer();
+  if (isResend) Toast.success("ส่งรหัสใหม่แล้ว");
+}
+
+async function verifyOtp() {
+  const phone = ($("#phone").value || "").replace(/\D/g, "");
+  const code  = $$(".otp-cell").map(c => c.value).join("").replace(/\D/g, "");
+  if (code.length !== 6) { $("#err2").textContent = "กรุณากรอกรหัส OTP ให้ครบ 6 หลัก"; return; }
+  const btn = $("#btn-verify");
+  setBtnLoading(btn, true);
+  const d = await API.post("/auth/otp/verify", { phone, code });
+  setBtnLoading(btn, false);
+  if (!d.ok) { $("#err2").textContent = d.error; return; }
+  go(qs("next") || (d.role === "MARKET_OWNER" ? "/owner" : "/search"));
+}
+
+function backToPhone() {
+  clearInterval(resendInterval);
+  $$(".otp-cell").forEach(c => c.value = "");
+  $("#err2").textContent = "";
+  $("#devbox").classList.add("hide");
+  $("#step-otp").classList.add("hide");
+  $("#step-phone").classList.remove("hide");
+  $("#phone").focus();
+}
+
+// OTP cells auto-advance + paste support
+document.addEventListener("DOMContentLoaded", () => {
+  const cells = $$(".otp-cell");
+  cells.forEach((cell, i) => {
+    cell.addEventListener("input", e => {
+      const val = e.target.value.replace(/\D/g, "");
+      e.target.value = val.slice(-1);
+      if (val && i < cells.length - 1) cells[i + 1].focus();
+      if (i === cells.length - 1 && val) verifyOtp();
+    });
+    cell.addEventListener("keydown", e => {
+      if (e.key === "Backspace" && !cell.value && i > 0) cells[i - 1].focus();
+      if (e.key === "Enter") verifyOtp();
+    });
+    cell.addEventListener("paste", e => {
+      e.preventDefault();
+      const pasted = (e.clipboardData || window.clipboardData).getData("text").replace(/\D/g, "");
+      pasted.slice(0, 6).split("").forEach((ch, j) => {
+        if (cells[i + j]) cells[i + j].value = ch;
+      });
+      const next = Math.min(i + pasted.length, cells.length - 1);
+      cells[next].focus();
+      if (pasted.length >= 6) verifyOtp();
+    });
+  });
+});
+</script>{% endblock %}

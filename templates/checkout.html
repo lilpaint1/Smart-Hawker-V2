@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}ชำระมัดจำ — {{ app_name }}{% endblock %}
+{% block body %}
+<div class="topbar">
+  <button class="back" onclick="history.back()" aria-label="กลับ" type="button">
+    <i data-lucide="chevron-left" aria-hidden="true"></i>
+  </button>
+  <h1>ชำระมัดจำ</h1>
+</div>
+
+<main class="page page-pad" id="main-content" style="padding-bottom:var(--s12)">
+  <div id="pay-wrap">
+    <div class="skeleton" style="height:520px;border-radius:var(--radius-lg)"></div>
+  </div>
+</main>
+
+{% with active='bookings' %}{% include "_bottomnav.html" %}{% endwith %}
+{% endblock %}
+{% block script %}<script>
+const BID = "{{ booking_id }}";
+let countdownTimer = null;
+const WINDOW_MIN = 30;
+
+async function load() {
+  const wrap = $("#pay-wrap");
+  const d = await API.get("/bookings/" + BID);
+  if (!d.ok) {
+    wrap.innerHTML = `<div class="card pad center-text muted mt2">
+      <i data-lucide="alert-circle" style="width:40px;height:40px;color:var(--danger-ink)" aria-hidden="true"></i>
+      <div class="mt2 bold">ไม่พบการจองนี้</div>
+      <a href="/bookings" class="btn btn-ghost mt3 btn-sm">ดูการจองทั้งหมด</a>
+    </div>`;
+    icons(wrap); return;
+  }
+  const b = d.booking;
+  if (b.paymentStatus === "PAID") { go("/confirm/" + BID); return; }
+
+  const startDate   = b.startDate || b.date;
+  const endDate     = b.endDate   || b.date;
+  const expireAt    = new Date(b.createdAt).getTime() + WINDOW_MIN * 60 * 1000;
+  const expired     = Date.now() > expireAt;
+  const dateRange   = startDate !== endDate
+    ? fmtDate(startDate) + " – " + fmtDate(endDate) : fmtDate(startDate);
+
+  wrap.innerHTML = `
+    <!-- Booking summary -->
+    <div class="card pad mb3" style="background:var(--brand-soft);border:1.5px solid var(--brand-200)">
+      <div class="row gap3 align-center">
+        <div style="width:44px;height:44px;border-radius:12px;background:var(--brand);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i data-lucide="store" style="width:20px;height:20px;color:#fff" aria-hidden="true"></i>
+        </div>
+        <div class="flex1" style="min-width:0">
+          <div class="bold truncate">${esc(b.marketName)}</div>
+          <div class="muted sub">ล็อก <b>${esc(b.lotCode)}</b> · ${dateRange}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Amount + QR -->
+    <div class="card pad mb3" style="align-items:center;text-align:center">
+      <div class="muted sub mb1">ยอดมัดจำที่ต้องชำระ</div>
+      <div role="text" aria-label="ยอด ${thb(b.depositAmount)}"
+           style="font-size:2.7rem;font-weight:800;color:var(--brand-ink);line-height:1.1">${thb(b.depositAmount)}</div>
+      <div class="muted mb4" style="font-size:.76rem">มัดจำ 20% ของค่าเช่ารวม · PromptPay โอนปลอดภัย (EMVCo)</div>
+
+      <!-- QR image -->
+      <div id="qr-ok" style="background:#fff;padding:14px;border-radius:16px;box-shadow:var(--shadow-sm);display:inline-block">
+        <img id="qr-img" src="/api/payments/${BID}/qr.png" width="210" height="210"
+             alt="QR PromptPay สำหรับชำระมัดจำ"
+             style="display:block;border-radius:6px"
+             onerror="document.getElementById('qr-ok').style.display='none';document.getElementById('qr-err').style.display='flex'">
+      </div>
+      <div id="qr-err" style="width:210px;height:210px;display:none;align-items:center;justify-content:center;flex-direction:column;gap:8px;border:2px dashed var(--line);border-radius:16px">
+        <i data-lucide="qr-code" style="width:48px;height:48px;color:var(--ink-ghost)" aria-hidden="true"></i>
+        <span class="muted small" style="max-width:160px;text-align:center">โหลด QR ไม่ได้<br>กดสร้างใหม่</span>
+      </div>
+
+      <div class="muted mt2" style="font-size:.74rem">รองรับทุกแอปธนาคารไทย</div>
+      <button class="btn btn-ghost btn-sm mt3" onclick="saveQr()" type="button" style="font-size:.8rem;min-height:0">
+        <i data-lucide="download" style="width:13px;height:13px" aria-hidden="true"></i>
+        บันทึก QR
+      </button>
+    </div>
+
+    <!-- Countdown -->
+    <div id="countdown-card" class="card pad mb3 row gap3" style="align-items:center">
+      <i data-lucide="${expired ? "clock-x" : "clock"}"
+         style="width:22px;height:22px;color:${expired ? "var(--danger-ink)" : "var(--warn-ink)"};flex-shrink:0" aria-hidden="true"></i>
+      <div class="flex1">
+        <div class="bold" style="color:${expired ? "var(--danger-ink)" : "var(--ink)"}">
+          ${expired ? "หมดเวลาชำระ" : "เวลาที่เหลือ"}
+        </div>
+        <div id="countdown" aria-live="polite"
+             style="font-size:1.5rem;font-weight:700;font-variant-numeric:tabular-nums;color:${expired ? "var(--danger-ink)" : "var(--brand-ink)"}">
+          ${expired ? "หมดเวลาแล้ว" : "—"}
+        </div>
+      </div>
+      ${expired
+        ? `<button class="btn btn-soft btn-sm" onclick="regenerateQr()" type="button">สร้าง QR ใหม่</button>`
+        : ""}
+    </div>
+
+    <!-- CTA buttons -->
+    <div class="col gap2">
+      <button id="btn-pay" class="btn btn-primary btn-block" onclick="confirmPay()" type="button"
+              ${expired ? "disabled" : ""} style="font-size:var(--text-base)">
+        <i data-lucide="check-circle-2" style="width:18px;height:18px" aria-hidden="true"></i>
+        ฉันชำระเงินแล้ว
+      </button>
+      <a href="/bookings" class="btn btn-ghost btn-block">ดูการจองทั้งหมด</a>
+    </div>
+    <p class="muted center-text mt3" style="font-size:.74rem;line-height:1.7">
+      เมื่อโอนเงินแล้ว กด "ฉันชำระเงินแล้ว" · ระบบบันทึกทันที<br>
+      <span style="color:var(--ink-ghost)">หากไม่ชำระใน ${WINDOW_MIN} นาที การจองจะถูกยกเลิกอัตโนมัติ</span>
+    </p>
+  `;
+  icons(wrap);
+
+  if (!expired) startCountdown(expireAt);
+}
+
+function startCountdown(expireAt) {
+  const el = $("#countdown");
+  if (!el) return;
+  function tick() {
+    const left = expireAt - Date.now();
+    if (left <= 0) {
+      clearInterval(countdownTimer);
+      el.textContent = "หมดเวลาแล้ว";
+      el.style.color = "var(--danger-ink)";
+      const btn = $("#btn-pay");
+      if (btn) btn.disabled = true;
+      const card = $("#countdown-card");
+      if (card && !card.querySelector("button")) {
+        card.insertAdjacentHTML("beforeend",
+          `<button class="btn btn-soft btn-sm" onclick="regenerateQr()" type="button">สร้าง QR ใหม่</button>`);
+      }
+      return;
+    }
+    const m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000);
+    el.textContent = `${m}:${String(s).padStart(2, "0")}`;
+    el.style.color = left < 120000 ? "var(--danger-ink)" : left < 300000 ? "var(--warn-ink)" : "var(--brand-ink)";
+  }
+  tick();
+  countdownTimer = setInterval(tick, 1000);
+}
+
+async function confirmPay() {
+  const btn = $("#btn-pay");
+  setBtnLoading(btn, true);
+  const d = await API.post("/payments/" + BID + "/confirm");
+  setBtnLoading(btn, false);
+  if (!d.ok) { Toast.error(d.error || "เกิดข้อผิดพลาด กรุณาลองใหม่"); return; }
+  clearInterval(countdownTimer);
+  go("/confirm/" + BID);
+}
+
+async function regenerateQr() {
+  const d = await API.post("/payments/" + BID + "/promptpay");
+  if (!d.ok) { Toast.error("สร้าง QR ใหม่ไม่ได้ " + (d.error || "")); return; }
+  const img = $("#qr-img");
+  if (img) {
+    document.getElementById("qr-ok").style.display = "inline-block";
+    document.getElementById("qr-err").style.display = "none";
+    img.src = "/api/payments/" + BID + "/qr.png?t=" + Date.now();
+  }
+  Toast.success("สร้าง QR ใหม่แล้ว");
+  clearInterval(countdownTimer);
+  load();
+}
+
+function saveQr() {
+  const img = document.getElementById("qr-img");
+  if (!img || !img.src) { Toast.warn("ไม่พบ QR"); return; }
+  const a = document.createElement("a");
+  a.href = img.src; a.download = "smarthawker-qr-payment.png"; a.click();
+  Toast.info("บันทึก QR แล้ว");
+}
+
+load();
+</script>{% endblock %}

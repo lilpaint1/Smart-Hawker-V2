@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}ค้นหาพื้นที่ขาย — {{ app_name }}{% endblock %}
+{% block body %}
+{# Sticky search topbar #}
+<div class="topbar" role="search" aria-label="ค้นหาตลาด">
+  <button class="back hide-desktop" onclick="history.back()" aria-label="กลับ" type="button">
+    <i data-lucide="chevron-left" aria-hidden="true"></i>
+  </button>
+  <div class="row gap2 flex1" style="background:var(--bg-2);border-radius:var(--radius-full);padding:var(--s2) var(--s4);border:1px solid var(--line)">
+    <i data-lucide="search" style="width:16px;height:16px;color:var(--ink-soft);flex-shrink:0" aria-hidden="true"></i>
+    <input id="q" placeholder="ค้นหาชื่อตลาด..." aria-label="ค้นหาตลาด"
+           style="border:none;outline:none;flex:1;font-size:var(--text-sm);background:none;color:var(--ink)">
+    <button id="q-clear" class="hide" aria-label="ล้างการค้นหา" onclick="clearQ()" type="button"
+            style="border:none;background:none;color:var(--ink-ghost);padding:0;min-height:0;min-width:0">
+      <i data-lucide="x" style="width:15px;height:15px"></i>
+    </button>
+  </div>
+  {# Map toggle (mobile only) #}
+  <button id="map-toggle" class="btn btn-ghost btn-sm hide-desktop"
+          onclick="toggleMapView()" type="button" aria-label="สลับมุมมองแผนที่"
+          style="min-height:0;padding:var(--s2) var(--s3);border-radius:var(--radius-full)">
+    <i data-lucide="map" style="width:16px;height:16px"></i>
+  </button>
+</div>
+
+{# Desktop: 3-column layout (filters | results | map), Mobile: single column #}
+<div class="search-layout" style="min-height:calc(100dvh - var(--topbar-h))">
+
+  {# Filter sidebar (desktop only) #}
+  <aside class="search-filters" aria-label="ตัวกรอง">
+    <div class="bold mb3" style="font-size:var(--text-sm)">ตัวกรอง</div>
+
+    <div class="form-group mb4">
+      <label class="label" for="f-province">จังหวัด</label>
+      <select id="f-province" class="input" onchange="applyFilters()">
+        <option value="">ทั้งหมด</option>
+        <option>กรุงเทพมหานคร</option>
+        <option>นนทบุรี</option>
+        <option>ปทุมธานี</option>
+        <option>สมุทรปราการ</option>
+        <option>เชียงใหม่</option>
+        <option>ภูเก็ต</option>
+        <option>ขอนแก่น</option>
+        <option>อุดรธานี</option>
+      </select>
+    </div>
+
+    <div class="form-group mb4">
+      <label class="label">ประเภทเช่า</label>
+      <div id="rent-chips" class="col gap1"></div>
+    </div>
+
+    <div class="form-group mb4">
+      <label class="label">ราคาสูงสุด/วัน</label>
+      <input id="f-maxprice" type="range" min="0" max="1000" step="50" value="0"
+             oninput="updatePriceLabel();applyFilters()"
+             style="width:100%;accent-color:var(--brand)">
+      <div class="between muted small mt1">
+        <span>ทุกราคา</span>
+        <span id="price-label">ทุกราคา</span>
+      </div>
+    </div>
+
+    <div class="form-group mb4">
+      <label class="label">เรียงตาม</label>
+      <select id="f-sort" class="input" onchange="applyFilters()">
+        <option value="popularity">ความนิยม</option>
+        <option value="rating">คะแนนรีวิว</option>
+        <option value="price">ราคา</option>
+      </select>
+    </div>
+
+    <div class="form-group mb4">
+      <label class="row gap2" style="cursor:pointer">
+        <input type="checkbox" id="f-avail" onchange="applyFilters()" style="accent-color:var(--brand)">
+        <span class="small bold">เฉพาะที่มีล็อกว่าง</span>
+      </label>
+    </div>
+
+    <button class="btn btn-ghost btn-block btn-sm" onclick="resetFilters()" type="button">
+      <i data-lucide="x" style="width:14px;height:14px"></i> รีเซ็ตตัวกรอง
+    </button>
+  </aside>
+
+  {# Results #}
+  <div class="search-results">
+    {# Mobile filter chips #}
+    <div class="hide-desktop px" style="padding-top:var(--s3);padding-bottom:var(--s2)">
+      <div class="row gap1 hide-scroll mb1" id="prov-chips-mob"></div>
+      <div class="row gap1 hide-scroll" id="rent-chips-mob"></div>
+    </div>
+
+    <div id="result-count" class="muted small" style="padding:0 var(--s5) var(--s2)"></div>
+    <div id="list" class="stagger" style="padding:0 var(--s5)"></div>
+  </div>
+
+  {# Map (desktop right pane + mobile toggle) #}
+  <div class="search-map" id="search-map-wrap">
+    <div id="search-map" style="height:100%"></div>
+  </div>
+</div>
+
+{# Mobile map overlay #}
+<div id="mobile-map-wrap" class="hide-desktop hide"
+     style="position:fixed;inset:0;z-index:80;background:var(--bg)">
+  <div class="topbar" style="position:relative">
+    <button class="back" onclick="toggleMapView()" type="button" aria-label="ปิดแผนที่">
+      <i data-lucide="x"></i>
+    </button>
+    <h1 style="font-size:var(--text-base)">แผนที่ตลาด</h1>
+  </div>
+  <div id="mobile-map" style="height:calc(100dvh - var(--topbar-h))"></div>
+</div>
+
+{% with active='search' %}{% include "_bottomnav.html" %}{% endwith %}
+{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+{% endblock %}
+{% block script %}<script>
+const state = { q:"", province:"", rentType:"", maxPrice:0, sort:"popularity", avail:false };
+let allMarkets = [], desktopMap = null, mobileMap = null, clusterGroup = null, mapInited = false, mobileMapInited = false, showMobileMap = false;
+
+// Province chips (mobile)
+const PROVINCES = ["กรุงเทพมหานคร","นนทบุรี","ปทุมธานี","สมุทรปราการ","เชียงใหม่","ภูเก็ต","ขอนแก่น","อุดรธานี"];
+function buildMobileChips() {
+  const pc = $("#prov-chips-mob"), rc = $("#rent-chips-mob");
+  const provs = [{label:"ทั้งหมด",value:""}, ...PROVINCES.map(p=>({label:p,value:p}))];
+  pc.innerHTML = provs.map((o,i) => `<button class="chip${i===0?" chip-active":""}" onclick="pickProvMob(this,'${o.value}')">${esc(o.label)}</button>`).join("");
+  const rents = [{label:"ทุกประเภท",value:""}, ...Object.entries(C.RENT_TYPE_LABEL).map(([v,l])=>({label:l,value:v}))];
+  rc.innerHTML = rents.map((o,i) => `<button class="chip${i===0?" chip-active":""}" onclick="pickRentMob(this,'${o.value}')">${esc(o.label)}</button>`).join("");
+}
+function pickProvMob(btn, v) {
+  $$(":scope button", btn.parentElement).forEach(b => b.classList.remove("chip-active"));
+  btn.classList.add("chip-active");
+  state.province = v;
+  load();
+}
+function pickRentMob(btn, v) {
+  $$(":scope button", btn.parentElement).forEach(b => b.classList.remove("chip-active"));
+  btn.classList.add("chip-active");
+  state.rentType = v;
+  load();
+}
+
+// Desktop rent chips
+function buildDesktopRentChips() {
+  const c = $("#rent-chips"); if (!c) return;
+  const opts = [{label:"ทุกประเภท",value:""}, ...Object.entries(C.RENT_TYPE_LABEL).map(([v,l])=>({label:l,value:v}))];
+  c.innerHTML = opts.map((o,i) => `<button class="chip${i===0?" chip-active":""}" onclick="pickRentDesktop(this,'${o.value}')">${esc(o.label)}</button>`).join("");
+}
+function pickRentDesktop(btn, v) {
+  $$(":scope button", btn.parentElement).forEach(b => b.classList.remove("chip-active"));
+  btn.classList.add("chip-active");
+  state.rentType = v;
+  load();
+}
+
+function applyFilters() {
+  state.province = ($("#f-province") && $("#f-province").value) || state.province;
+  state.sort = ($("#f-sort") && $("#f-sort").value) || "popularity";
+  state.avail = !!($("#f-avail") && $("#f-avail").checked);
+  const maxp = parseInt($("#f-maxprice") && $("#f-maxprice").value) || 0;
+  state.maxPrice = maxp;
+  load();
+}
+function updatePriceLabel() {
+  const v = parseInt($("#f-maxprice") && $("#f-maxprice").value) || 0;
+  const lbl = $("#price-label");
+  if (lbl) lbl.textContent = v > 0 ? thb(v) : "ทุกราคา";
+}
+function resetFilters() {
+  state.province = ""; state.rentType = ""; state.maxPrice = 0; state.sort = "popularity"; state.avail = false;
+  const fp = $("#f-province"); if (fp) fp.value = "";
+  const fs = $("#f-sort"); if (fs) fs.value = "popularity";
+  const fx = $("#f-maxprice"); if (fx) fx.value = 0;
+  const fa = $("#f-avail"); if (fa) fa.checked = false;
+  updatePriceLabel();
+  buildMobileChips();
+  buildDesktopRentChips();
+  load();
+}
+function clearQ() { $("#q").value = ""; state.q = ""; $("#q-clear").classList.add("hide"); load(); }
+
+function skel() {
+  const list = $("#list");
+  list.innerHTML = skelCards(4);
+}
+
+async function load() {
+  skel();
+  const p = new URLSearchParams();
+  if (state.q)        p.set("q",        state.q);
+  if (state.province) p.set("province", state.province);
+  if (state.rentType) p.set("rentType", state.rentType);
+  if (state.maxPrice) p.set("maxPrice", state.maxPrice);
+  if (state.sort)     p.set("sort",     state.sort);
+  if (state.avail)    p.set("available","1");
+  const d = await API.get("/markets?" + p.toString());
+  const list = $("#list");
+  list.innerHTML = "";
+
+  if (!d.ok || !d.markets || !d.markets.length) {
+    list.innerHTML = `<div class="card pad center-text mt2">
+      <i data-lucide="store" style="width:40px;height:40px;color:var(--ink-ghost)"></i>
+      <div class="muted mt2">ไม่พบตลาดตามเงื่อนไข</div>
+      <button class="btn btn-ghost btn-sm mt3" onclick="resetFilters()">รีเซ็ตตัวกรอง</button>
+    </div>`;
+    icons(list);
+    return;
+  }
+  allMarkets = d.markets;
+  const rc = $("#result-count");
+  if (rc) rc.textContent = `พบ ${allMarkets.length} ตลาด`;
+
+  list.innerHTML = allMarkets.map(m => marketCardHTML(m, true)).join("");
+  icons(list);
+  updateMap(allMarkets);
+}
+
+// ---- Map ----
+function initDesktopMap() {
+  if (mapInited) return;
+  mapInited = true;
+  desktopMap = L.map("search-map").setView([13.74, 100.56], 10);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OSM" }).addTo(desktopMap);
+  clusterGroup = L.markerClusterGroup({ disableClusteringAtZoom: 13 });
+  desktopMap.addLayer(clusterGroup);
+}
+function initMobileMap() {
+  if (mobileMapInited) return;
+  mobileMapInited = true;
+  mobileMap = L.map("mobile-map").setView([13.74, 100.56], 10);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OSM" }).addTo(mobileMap);
+}
+function updateMap(markets) {
+  if (!desktopMap || !clusterGroup) return;
+  clusterGroup.clearLayers();
+  markets.forEach(m => {
+    const mk = L.marker([m.lat, m.lng]).addTo(clusterGroup);
+    mk.bindPopup(
+      `<b>${esc(m.name)}</b><br><span style="color:#6b7280;font-size:12px">${esc(m.district||"")}, ${esc(m.province)}</span>`+
+      `<br><span style="font-size:13px">ว่าง ${m.availableLots}/${m.totalLots} ล็อก · ${m.minPrice?thb(m.minPrice)+"/วัน":"เต็ม"}</span>`+
+      `<br><a href="/market/${m.id}" style="color:var(--brand-ink);font-weight:600;font-size:13px">ดูรายละเอียด →</a>`
+    );
+  });
+}
+function toggleMapView() {
+  showMobileMap = !showMobileMap;
+  const wrap = $("#mobile-map-wrap");
+  wrap.classList.toggle("hide", !showMobileMap);
+  if (showMobileMap) {
+    initMobileMap();
+    setTimeout(() => { mobileMap && mobileMap.invalidateSize(); }, 60);
+  }
+}
+
+// Search input debounce
+const qInput = $("#q");
+if (qInput) {
+  qInput.addEventListener("input", debounce(e => {
+    state.q = e.target.value;
+    $("#q-clear").classList.toggle("hide", !state.q);
+    load();
+  }, 280));
+}
+
+// Desktop map init on resize
+const ro = new ResizeObserver(() => {
+  if (window.innerWidth >= 1024) {
+    initDesktopMap();
+    setTimeout(() => { desktopMap && desktopMap.invalidateSize(); updateMap(allMarkets); }, 80);
+  }
+});
+const mapWrap = $("#search-map-wrap");
+if (mapWrap) ro.observe(mapWrap);
+
+buildMobileChips();
+buildDesktopRentChips();
+load();
+if (window.innerWidth >= 1024) setTimeout(initDesktopMap, 100);
+</script>{% endblock %}

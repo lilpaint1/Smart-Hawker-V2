@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22c55e;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#16a34a;stop-opacity:1"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="450" fill="url(#g)"/>
+  <rect width="800" height="450" fill="rgba(0,0,0,0.12)"/>
+  <!-- Leaf shape -->
+  <path d="M400 100 C350 140, 280 200, 300 280 C320 340, 400 360, 400 360 C400 360, 480 340, 500 280 C520 200, 450 140, 400 100Z" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.6)" stroke-width="4"/>
+  <!-- Leaf vein -->
+  <line x1="400" y1="110" x2="400" y2="350" stroke="rgba(255,255,255,0.7)" stroke-width="3"/>
+  <line x1="400" y1="180" x2="340" y2="220" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
+  <line x1="400" y1="210" x2="340" y2="250" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
+  <line x1="400" y1="180" x2="460" y2="220" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
+  <line x1="400" y1="210" x2="460" y2="250" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
+  <!-- Basket circles decorative -->
+  <circle cx="200" cy="200" r="60" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+  <circle cx="600" cy="200" r="60" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+  <text x="400" y="400" font-family="'Noto Sans Thai', sans-serif" font-size="42" font-weight="700" fill="white" text-anchor="middle" opacity="0.95">ตลาดสด</text>
+  <text x="400" y="435" font-family="'Noto Sans Thai', sans-serif" font-size="22" fill="rgba(255,255,255,0.8)" text-anchor="middle">Fresh Market</text>
+</svg>

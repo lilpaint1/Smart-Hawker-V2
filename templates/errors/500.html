@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}เกิดข้อผิดพลาด — {{ app_name }}{% endblock %}
+{% block sidebar %}{% endblock %}
+{% block shell_class %}shell-bare{% endblock %}
+{% block body %}
+<main class="center" style="min-height:100dvh;flex-direction:column;padding:var(--s5)">
+  <div class="center mb4 fadeUp" style="width:96px;height:96px;border-radius:50%;background:var(--danger-soft)" aria-hidden="true">
+    <i data-lucide="server-crash" style="width:52px;height:52px;color:var(--danger-ink)"></i>
+  </div>
+  <h1 class="h1 center-text fadeUp" style="font-size:5rem;line-height:1;color:var(--danger-ink);animation-delay:.05s">500</h1>
+  <h2 class="h2 center-text mb2 fadeUp" style="animation-delay:.1s">เกิดข้อผิดพลาดภายในระบบ</h2>
+  <p class="muted sub center-text mb6 fadeUp" style="animation-delay:.15s;max-width:360px">
+    ระบบพบข้อผิดพลาดที่ไม่คาดคิด ทีมงานได้รับแจ้งแล้ว กรุณาลองใหม่อีกครั้ง
+  </p>
+  <div class="col gap2 fadeUp" style="width:100%;max-width:300px;animation-delay:.2s">
+    <button onclick="location.reload()" class="btn btn-primary btn-block" type="button">
+      <i data-lucide="refresh-cw" style="width:16px;height:16px" aria-hidden="true"></i>
+      ลองใหม่อีกครั้ง
+    </button>
+    <a href="/" class="btn btn-ghost btn-block">
+      <i data-lucide="home" style="width:16px;height:16px" aria-hidden="true"></i>
+      กลับหน้าหลัก
+    </a>
+  </div>
+</main>
+{% endblock %}

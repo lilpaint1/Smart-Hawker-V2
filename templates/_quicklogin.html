@@ -1,0 +1,43 @@
+{# _quicklogin.html — Quick login (prototype mode) — fix swapped labels
+   ปิดด้วย ENABLE_QUICK_LOGIN=0 ใน .env
+   Labels: ใช้ ROLE_LABEL จาก constants.py (กัน mismatch)
+#}
+{% if enable_quick_login %}
+<div class="dashed mt3" style="padding:var(--s4)" role="region" aria-label="โหมดทดลองใช้งาน">
+  <div class="row gap2 mb2">
+    <div class="center" style="width:28px;height:28px;border-radius:8px;background:var(--warn-soft)">
+      <i data-lucide="zap" style="color:var(--warn-ink);width:15px;height:15px" aria-hidden="true"></i>
+    </div>
+    <div>
+      <div class="bold small">โหมดทดลอง (Prototype)</div>
+      <div class="ghost" style="font-size:.72rem">ไม่ต้อง OTP — สำหรับทดสอบระบบ</div>
+    </div>
+  </div>
+  <div class="form-group mb3">
+    <label class="label" for="ql-name">ตั้งชื่อ (ไม่บังคับ)</label>
+    <input id="ql-name" class="input" placeholder="เช่น ร้านเจ๊หมวย" maxlength="40" autocomplete="name">
+  </div>
+  <div class="row gap2">
+    <button class="btn btn-ghost flex1 col" style="height:auto;padding:var(--s3);gap:var(--s1);min-height:72px"
+      onclick="quickLogin('SELLER')" type="button" aria-label="เข้าระบบในฐานะผู้ขาย">
+      <i data-lucide="store" style="color:var(--brand)" aria-hidden="true"></i>
+      <span class="small bold">{{ role_label.SELLER.split(' ')[0] }}</span>
+      <span class="ghost" style="font-size:.7rem;font-weight:400">พ่อค้าแม่ค้า</span>
+    </button>
+    <button class="btn btn-ghost flex1 col" style="height:auto;padding:var(--s3);gap:var(--s1);min-height:72px"
+      onclick="quickLogin('MARKET_OWNER')" type="button" aria-label="เข้าระบบในฐานะเจ้าของตลาด">
+      <i data-lucide="building-2" style="color:var(--accent)" aria-hidden="true"></i>
+      <span class="small bold">เจ้าของตลาด</span>
+      <span class="ghost" style="font-size:.7rem;font-weight:400">ผู้ให้เช่าพื้นที่</span>
+    </button>
+  </div>
+</div>
+<script>
+async function quickLogin(role) {
+  const name = ($("#ql-name") && $("#ql-name").value.trim()) || "ผู้ทดลอง";
+  const d = await API.post("/auth/quick", { name, role });
+  if (d.ok) { go(role === "MARKET_OWNER" ? "/owner" : "/search"); }
+  else Toast.error(d.error || "เกิดข้อผิดพลาด");
+}
+</script>
+{% endif %}

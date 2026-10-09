@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% block title %}ตลาด — {{ app_name }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endblock %}
+{% block body %}
+<div class="topbar">
+  <button class="back" onclick="history.back()" aria-label="กลับ" type="button">
+    <i data-lucide="chevron-left" aria-hidden="true"></i>
+  </button>
+  <h1 id="mname" class="truncate">ตลาด</h1>
+  <button id="fav-btn" class="btn btn-icon sm" aria-label="บันทึกรายการโปรด" type="button"
+          style="border:1px solid var(--line);background:var(--surface)"
+          onclick="handleFav()">
+    <i data-lucide="heart" id="fav-icon" style="width:18px;height:18px"></i>
+  </button>
+  <button class="btn btn-icon sm" aria-label="แชร์ตลาด" type="button"
+          style="border:1px solid var(--line);background:var(--surface)"
+          onclick="shareMarket()">
+    <i data-lucide="share-2" style="width:18px;height:18px" aria-hidden="true"></i>
+  </button>
+</div>
+
+<main id="content" style="padding-bottom:var(--s8)">
+  <div class="skeleton" style="height:220px;border-radius:0"></div>
+</main>
+
+{# Desktop sticky booking summary #}
+{% endblock %}
+{% block script %}<script>
+const MID = "{{ market_id }}";
+let mkt = null;
+let isFav = false;
+
+async function loadMarket() {
+  const d = await API.get("/markets/" + MID);
+  if (!d.ok) {
+    $("#content").innerHTML = `<div class="center-text muted mt5 page"><i data-lucide="alert-circle" style="width:40px;height:40px;color:var(--danger-ink)"></i><div class="mt2">ไม่พบตลาดนี้</div><a href="/search" class="btn btn-ghost mt4">กลับไปค้นหา</a></div>`;
+    icons($("#content")); return;
+  }
+  mkt = d.market;
+  isFav = mkt.isFav || false;
+  $("#mname").textContent = mkt.name;
+  updateFavBtn();
+
+  const lotsHTML = mkt.lots.length
+    ? mkt.lots.map(l => {
+        const avail  = l.status === "AVAILABLE";
+        const booked = l.status === "BOOKED";
+        const closed = l.status === "CLOSED";
+        const statusChip = avail ? "" : booked
+          ? `<span class="chip chip-danger">จองแล้ว</span>`
+          : `<span class="chip" style="background:var(--bg-2)">ปิด</span>`;
+        return `<div class="card pad between mt2" style="align-items:flex-start">
+          <div style="flex:1;min-width:0">
+            <div class="row gap2 flex-wrap mb1">
+              <span class="bold" style="font-size:var(--text-lg)">ล็อก ${esc(l.code)}</span>
+              <span class="chip">${esc(C.RENT_TYPE_LABEL[l.rentType] || l.rentType)}</span>
+              ${statusChip}
+            </div>
+            ${l.note ? `<div class="muted sub mb1">${esc(l.note)}</div>` : ""}
+            <div class="price" style="font-size:var(--text-lg)">${thb(l.pricePerDay)}/วัน</div>
+          </div>
+          <div style="flex-shrink:0;margin-left:var(--s3)">
+            ${avail
+              ? `<button class="btn btn-primary btn-sm" onclick="go('/book/${l.id}')" aria-label="จองล็อก ${esc(l.code)}">
+                   <i data-lucide="calendar-plus" style="width:15px;height:15px"></i>จอง
+                 </button>`
+              : ""}
+          </div>
+        </div>`;
+      }).join("")
+    : `<div class="card pad center-text muted mt2"><i data-lucide="package-open" style="width:32px;height:32px"></i><div class="mt2">ยังไม่มีล็อกในตลาดนี้</div></div>`;
+
+  const tags = (mkt.tags || []).map(t => `<span class="chip chip-accent">${esc(t)}</span>`).join("");
+  const avgR = mkt.avgRating ? mkt.avgRating.toFixed(1) : null;
+
+  $("#content").innerHTML = `
+    <div style="position:relative;height:220px;overflow:hidden">
+      <div style="height:100%;background:linear-gradient(160deg,var(--brand-300),var(--brand-700));display:flex;align-items:flex-end;padding:var(--s5)">
+        <div style="color:#fff;position:relative;z-index:6">
+          <div class="h2" style="color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.45)">${esc(mkt.name)}</div>
+          <div class="row gap1 mt1" style="opacity:.9"><i data-lucide="map-pin" style="width:13px"></i>${esc(mkt.district||"")}${mkt.district?", ":""}${esc(mkt.province)}</div>
+        </div>
+      </div>
+      ${mkt.coverPhotoUrl ? `
+        <img src="${escAttr(mkt.coverPhotoUrl)}" alt="${escAttr(mkt.name)}"
+             style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:3"
+             onerror="this.remove()">
+        <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.04) 0%,rgba(0,0,0,.5) 100%);z-index:4;pointer-events:none"></div>` : ""}
+      ${mkt.isVerified ? `<span class="chip chip-accent" style="position:absolute;top:var(--s3);left:var(--s3);z-index:7"><i data-lucide="badge-check" style="width:13px"></i>ผ่านการรับรอง</span>` : ""}
+    </div>
+
+    <div class="page" style="padding-top:var(--s5)">
+      <div class="row gap2 mb2" style="flex-wrap:wrap">
+        <div class="h2 flex1">${esc(mkt.name)}</div>
+        ${mkt.isVerified ? `<i data-lucide="badge-check" style="width:20px;height:20px;color:var(--accent)" title="ตลาดผ่านการรับรอง"></i>` : ""}
+      </div>
+
+      <div class="row gap1 muted sub mb2">
+        <i data-lucide="map-pin" style="width:14px;height:14px" aria-hidden="true"></i>
+        ${esc(mkt.district||"")}${mkt.district?", ":""}${esc(mkt.province)}
+      </div>
+
+      ${mkt.openingHours ? `<div class="row gap1 muted sub mb2"><i data-lucide="clock" style="width:14px;height:14px"></i>${esc(mkt.openingHours)}</div>` : ""}
+
+      <div class="row gap2 mb3">
+        ${avgR ? `<div class="row gap1">${stars(mkt.avgRating, 15)}<span class="bold">${avgR}</span><span class="muted sub">(${mkt.reviewCount} รีวิว)</span></div>` : `<span class="ghost sub">ยังไม่มีรีวิว</span>`}
+        <span class="chip">${mkt.availableLots}/${mkt.totalLots} ล็อกว่าง</span>
+      </div>
+
+      ${tags ? `<div class="row gap1 flex-wrap mb3">${tags}</div>` : ""}
+
+      ${mkt.description ? `<div class="sub mb3" style="line-height:1.65;color:var(--ink-2)">${esc(mkt.description)}</div>` : ""}
+
+      <div class="row gap2 mb4">
+        <a class="btn btn-ghost flex1" target="_blank" rel="noopener"
+           href="https://www.google.com/maps/dir/?api=1&destination=${mkt.lat},${mkt.lng}"
+           aria-label="นำทางไปยัง ${esc(mkt.name)}">
+          <i data-lucide="navigation" style="width:16px;height:16px" aria-hidden="true"></i>นำทาง
+        </a>
+        <button class="btn btn-ghost flex1" onclick="go('/chat/${mkt.ownerId}')" type="button"
+                aria-label="แชทกับเจ้าของตลาด">
+          <i data-lucide="message-circle" style="width:16px;height:16px" aria-hidden="true"></i>แชทเจ้าของ
+        </button>
+      </div>
+
+      <div id="mini-map" class="map-box mb4" style="height:160px"></div>
+
+      <div class="title mb2">ล็อกขายของ</div>
+      ${lotsHTML}
+
+      <div id="reviews-section" class="mt5"></div>
+    </div>`;
+
+  icons($("#content"));
+  initMiniMap(mkt.lat, mkt.lng);
+  loadReviews();
+}
+
+function initMiniMap(lat, lng) {
+  const m = L.map("mini-map", { zoomControl:false, attributionControl:false, scrollWheelZoom:false, dragging:false });
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(m);
+  m.setView([lat, lng], 14);
+  L.marker([lat, lng]).addTo(m);
+}
+
+// ---- Reviews ----
+let selRating = 5;
+async function loadReviews() {
+  const d = await API.get("/reviews?targetType=MARKET&targetId=" + MID);
+  const avg = d.average ? d.average.toFixed(1) : "—";
+  const dist = d.distribution || {};
+  const loginBtn = ME ? "" : `<a href="/login?next=/market/${MID}" class="btn btn-soft btn-sm">เข้าสู่ระบบเพื่อรีวิว</a>`;
+
+  // rating distribution bars
+  const distBars = [5,4,3,2,1].map(i => {
+    const cnt = dist[i] || 0;
+    const pct = d.count ? Math.round(cnt / d.count * 100) : 0;
+    return `<div class="row gap2" style="align-items:center">
+      <span class="muted" style="width:10px;font-size:.72rem;font-weight:700">${i}</span>
+      <i data-lucide="star" style="width:11px;height:11px;color:#f59e0b;fill:#f59e0b" aria-hidden="true"></i>
+      <div style="flex:1;height:6px;background:var(--bg-2);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:#f59e0b;border-radius:3px;transition:width .4s"></div>
+      </div>
+      <span class="muted" style="font-size:.72rem;width:20px">${cnt}</span>
+    </div>`;
+  }).join("");
+
+  const reviewItems = (d.reviews || []).map(r =>
+    `<div class="card pad mt2">
+      <div class="between mb1">
+        <div class="row gap2">
+          <div class="avatar" style="width:32px;height:32px;background:${avaColor(r.fromName)};font-size:13px">${esc(r.fromName.charAt(0))}</div>
+          <span class="bold sub">${esc(r.fromName)}</span>
+        </div>
+        <div class="row gap1">${stars(r.rating, 13)}</div>
+      </div>
+      ${r.comment ? `<div class="sub" style="color:var(--ink-2);line-height:1.5">${esc(r.comment)}</div>` : ""}
+      <div class="ghost" style="font-size:.7rem;margin-top:var(--s1)">${fmtDate(r.createdAt)}</div>
+    </div>`
+  ).join("");
+
+  const formHTML = ME ? `
+    <div id="rform" class="card pad mt3 hide scalein">
+      <div class="label">ให้คะแนน</div>
+      <div id="rstars" class="row gap1 mb3"></div>
+      <div class="form-group mb3">
+        <textarea id="rcomment" class="input" rows="2" placeholder="เล่าประสบการณ์ที่ตลาดนี้..."></textarea>
+      </div>
+      <button class="btn btn-primary btn-block" onclick="submitReview()" type="button">ส่งรีวิว</button>
+    </div>` : "";
+
+  $("#reviews-section").innerHTML = `
+    <div class="between mb3">
+      <div class="title">รีวิว</div>
+      ${ME ? `<button class="btn btn-soft btn-sm" onclick="toggleForm()" type="button">+ เขียนรีวิว</button>` : loginBtn}
+    </div>
+    <div class="card pad mb3">
+      <div class="row gap4">
+        <div class="center-text">
+          <div class="h1" style="color:#f59e0b;font-size:3rem;line-height:1">${avg}</div>
+          <div>${stars(Math.round(d.average || 0), 14)}</div>
+          <div class="muted small mt1">${d.count || 0} รีวิว</div>
+        </div>
+        <div class="flex1 col gap1">${distBars}</div>
+      </div>
+    </div>
+    ${formHTML}
+    ${reviewItems || `<div class="muted center-text card pad">ยังไม่มีรีวิว — เป็นคนแรกที่รีวิวตลาดนี้!</div>`}`;
+
+  buildRatingStars();
+  icons($("#reviews-section"));
+}
+
+function buildRatingStars() {
+  const c = $("#rstars"); if (!c) return; c.innerHTML = "";
+  for (let i = 1; i <= 5; i++) {
+    const b = document.createElement("button");
+    b.type = "button"; b.style.cssText = "background:none;border:none;padding:2px;min-height:0;min-width:0";
+    b.innerHTML = `<i data-lucide="star" style="width:28px;height:28px;color:#f59e0b;fill:${i<=selRating?"#f59e0b":"none"}"></i>`;
+    b.onclick = () => { selRating = i; buildRatingStars(); };
+    c.appendChild(b);
+  }
+  icons(c);
+}
+function toggleForm() {
+  const f = $("#rform"); if (f) f.classList.toggle("hide");
+}
+async function submitReview() {
+  const comment = ($("#rcomment") && $("#rcomment").value.trim()) || "";
+  const d = await API.post("/reviews", { targetType:"MARKET", targetId:MID, rating:selRating, comment });
+  if (!d.ok) { Toast.error(d.error); return; }
+  Toast.success("ขอบคุณสำหรับรีวิว!");
+  loadReviews();
+}
+
+// ---- Favorites ----
+function updateFavBtn() {
+  const ic = $("#fav-icon");
+  if (ic) ic.style.fill = isFav ? "var(--danger)" : "none";
+  if (ic) ic.style.color = isFav ? "var(--danger)" : "var(--ink-soft)";
+}
+async function handleFav() {
+  if (!ME || !ME.id) { go("/login?next=/market/" + MID); return; }
+  const method = isFav ? "del" : "post";
+  const d = await API[method]("/favorites/" + MID);
+  if (!d.ok) { Toast.error(d.error); return; }
+  isFav = d.isFav;
+  updateFavBtn();
+  Toast.success(isFav ? "เพิ่มในรายการโปรดแล้ว" : "นำออกจากรายการโปรด");
+}
+
+function shareMarket() {
+  const url = location.href;
+  if (navigator.share) {
+    navigator.share({ title: mkt && mkt.name, url }).catch(() => {});
+  } else {
+    navigator.clipboard && navigator.clipboard.writeText(url);
+    Toast.info("คัดลอก URL แล้ว");
+  }
+}
+
+loadMarket();
+</script>{% endblock %}

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}จัดการตลาด — {{ app_name }}{% endblock %}
+{% block body %}
+<div class="topbar">
+  <button class="back" onclick="go('/admin')" aria-label="กลับแดชบอร์ด" type="button">
+    <i data-lucide="chevron-left" aria-hidden="true"></i>
+  </button>
+  <h1>จัดการตลาด</h1>
+</div>
+
+<div class="page-pad">
+  <div class="row gap2 mb3">
+    <div class="input row gap1 flex1" style="padding:var(--s2) var(--s3)">
+      <i data-lucide="search" style="width:15px;height:15px;color:var(--ink-ghost);flex-shrink:0" aria-hidden="true"></i>
+      <input id="q" placeholder="ค้นหาชื่อตลาด..." style="border:none;outline:none;flex:1;background:none;font-size:var(--text-sm)"
+             oninput="debounce(load,300)()" aria-label="ค้นหาตลาด">
+    </div>
+    <select id="f-verified" class="input" onchange="load()" style="width:auto;min-width:120px" aria-label="กรองสถานะ">
+      <option value="">ทุกสถานะ</option>
+      <option value="1">รับรองแล้ว</option>
+      <option value="0">ยังไม่รับรอง</option>
+    </select>
+  </div>
+
+  <div id="count" class="ghost small mb2"></div>
+  <div id="list" class="stagger">
+    <div class="skeleton" style="height:80px;border-radius:var(--radius-lg)"></div>
+    <div class="skeleton mt2" style="height:80px;border-radius:var(--radius-lg)"></div>
+    <div class="skeleton mt2" style="height:80px;border-radius:var(--radius-lg)"></div>
+  </div>
+</div>
+{% endblock %}
+{% block script %}<script>
+async function load() {
+  const q = ($("#q") && $("#q").value.trim()) || "";
+  const vf = ($("#f-verified") && $("#f-verified").value) || "";
+  const list = $("#list"), cnt = $("#count");
+  const p = new URLSearchParams();
+  if (q)  p.set("q", q);
+  if (vf !== "") p.set("verified", vf);
+  const d = await API.get("/admin/markets?" + p.toString());
+  const markets = d.markets || [];
+  if (cnt) cnt.textContent = `${markets.length} ตลาด`;
+  if (!markets.length) {
+    list.innerHTML = `<div class="muted center-text card pad">ไม่พบตลาด</div>`;
+    return;
+  }
+  list.innerHTML = markets.map(m => {
+    const avgR = m.avgRating ? m.avgRating.toFixed(1) : "—";
+    return `<div class="card pad mt2">
+      <div class="between mb2">
+        <div style="min-width:0;flex:1">
+          <div class="row gap1 mb1" style="flex-wrap:wrap">
+            <span class="bold truncate">${esc(m.name)}</span>
+            ${m.is_verified  ? `<span class="chip chip-sm" style="background:var(--success-soft);color:var(--success-ink)"><i data-lucide="badge-check" style="width:11px;height:11px"></i>รับรอง</span>` : ""}
+            ${m.is_featured  ? `<span class="chip chip-sm" style="background:#fff7ed;color:var(--warn-ink)"><i data-lucide="star" style="width:11px;height:11px"></i>ฟีเจอร์</span>` : ""}
+          </div>
+          <div class="muted small">${esc(m.province)} · ล็อก ${m.totalLots || 0} · ว่าง ${m.availableLots || 0}</div>
+          <div class="ghost" style="font-size:.65rem">★ ${avgR} (${m.reviewCount || 0} รีวิว) · เจ้าของ: ${esc(m.ownerName || "—")}</div>
+        </div>
+        <div class="col gap1" style="flex-shrink:0;margin-left:var(--s3)">
+          <button class="btn btn-soft btn-sm" onclick="toggleVerify('${m.id}', ${m.is_verified})" type="button"
+                  aria-label="${m.is_verified ? "ยกเลิกการรับรอง" : "รับรอง"}ตลาด ${esc(m.name)}">
+            <i data-lucide="${m.is_verified ? "x" : "badge-check"}" style="width:13px;height:13px" aria-hidden="true"></i>
+            ${m.is_verified ? "ยกเลิกรับรอง" : "รับรอง"}
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="toggleFeature('${m.id}', ${m.is_featured})" type="button"
+                  aria-label="${m.is_featured ? "ยกเลิกแนะนำ" : "แนะนำ"}ตลาด ${esc(m.name)}">
+            <i data-lucide="${m.is_featured ? "star-off" : "star"}" style="width:13px;height:13px" aria-hidden="true"></i>
+            ${m.is_featured ? "ยกเลิกแนะนำ" : "แนะนำ"}
+          </button>
+          <a href="/market/${m.id}" class="btn btn-ghost btn-sm" target="_blank" rel="noopener"
+             aria-label="ดูหน้าตลาด ${esc(m.name)}">
+            <i data-lucide="external-link" style="width:13px;height:13px" aria-hidden="true"></i>ดูหน้า
+          </a>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+  icons(list);
+}
+
+async function toggleVerify(id, isVerified) {
+  const d = await API.patch("/admin/markets/" + id, { verified: !isVerified });
+  if (!d.ok) { Toast.error(d.error); return; }
+  Toast.success(isVerified ? "ยกเลิกการรับรองแล้ว" : "รับรองตลาดแล้ว");
+  load();
+}
+
+async function toggleFeature(id, isFeatured) {
+  const d = await API.patch("/admin/markets/" + id, { featured: !isFeatured });
+  if (!d.ok) { Toast.error(d.error); return; }
+  Toast.success(isFeatured ? "ยกเลิกแนะนำแล้ว" : "ตั้งเป็นตลาดแนะนำแล้ว");
+  load();
+}
+
+load();
+</script>{% endblock %}

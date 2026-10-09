@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}จองสำเร็จ — {{ app_name }}{% endblock %}
+{% block body %}
+<main class="page" id="main-content"
+      style="min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:var(--s5)">
+  <div id="content" style="width:100%;max-width:480px">
+    <div class="center mt2 mb4 fadeUp" aria-hidden="true">
+      <div class="center" style="width:96px;height:96px;border-radius:50%;background:var(--success-soft)">
+        <i data-lucide="check-circle-2" style="width:56px;height:56px;color:var(--success-ink)"></i>
+      </div>
+    </div>
+    <h1 class="h2 center-text mb1 fadeUp" style="animation-delay:.05s">จองสำเร็จแล้ว!</h1>
+    <p class="muted sub center-text mb4 fadeUp" style="animation-delay:.1s">
+      ระบบยืนยันการจองและรับมัดจำเรียบร้อยแล้ว
+    </p>
+
+    <div id="receipt" class="card pad mb4 fadeUp" style="animation-delay:.15s">
+      <div class="label mb3">ใบเสร็จการจอง</div>
+      <div class="skeleton" style="height:120px"></div>
+    </div>
+
+    <div class="col gap2 fadeUp" style="animation-delay:.2s">
+      <button class="btn btn-primary btn-block" onclick="go('/bookings')" type="button">
+        <i data-lucide="list-checks" style="width:16px;height:16px" aria-hidden="true"></i>
+        ดูการจองของฉัน
+      </button>
+      <button class="btn btn-ghost btn-block" onclick="go('/search')" type="button">
+        <i data-lucide="search" style="width:16px;height:16px" aria-hidden="true"></i>
+        กลับไปค้นหาต่อ
+      </button>
+    </div>
+  </div>
+</main>
+{% endblock %}
+{% block script %}<script>
+const BID = "{{ booking_id }}";
+
+function row(k, v, highlight) {
+  return `<div class="between" style="padding:.4rem 0;${highlight ? "font-weight:700;color:var(--brand-ink)" : ""}">
+    <span class="muted sub">${k}</span>
+    <span class="sub">${v}</span>
+  </div>`;
+}
+
+async function load() {
+  const d = await API.get("/bookings/" + BID);
+  const rec = $("#receipt");
+  if (!d.ok) { if (rec) rec.innerHTML = `<div class="muted center-text">ไม่สามารถโหลดข้อมูล</div>`; return; }
+  const b = d.booking;
+  const startDate = b.startDate || b.date;
+  const endDate   = b.endDate   || b.date;
+  const days = startDate === endDate ? 1 : Math.round((new Date(endDate) - new Date(startDate)) / 86400000) + 1;
+
+  if (rec) rec.innerHTML = `
+    <div class="label mb3">ใบเสร็จการจอง</div>
+    ${row("ตลาด", esc(b.marketName))}
+    ${row("ล็อก", esc(b.lotCode))}
+    ${row("วันที่", fmtDate(startDate) + (startDate !== endDate ? " — " + fmtDate(endDate) : ""))}
+    ${row("จำนวนวัน", `${days} วัน`)}
+    <hr style="border:none;border-top:1px solid var(--line);margin:var(--s2) 0">
+    ${row("มัดจำที่ชำระแล้ว", thb(b.depositAmount), true)}
+    <div class="center mt3">
+      <span class="chip" style="background:var(--success-soft);color:var(--success-ink);font-size:var(--text-sm)">
+        <i data-lucide="check-circle-2" style="width:13px;height:13px"></i>ชำระเงินสำเร็จ
+      </span>
+    </div>`;
+  icons(rec);
+}
+
+load();
+</script>{% endblock %}

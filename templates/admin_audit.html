@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Audit Log — {{ app_name }}{% endblock %}
+{% block body %}
+<div class="topbar">
+  <button class="back" onclick="go('/admin')" aria-label="กลับแดชบอร์ด" type="button">
+    <i data-lucide="chevron-left" aria-hidden="true"></i>
+  </button>
+  <h1>บันทึกการกระทำ (Audit Log)</h1>
+</div>
+
+<div class="page-pad">
+  <div class="row gap2 mb3" style="flex-wrap:wrap">
+    <div class="input row gap1 flex1" style="padding:var(--s2) var(--s3)">
+      <i data-lucide="search" style="width:15px;height:15px;color:var(--ink-ghost);flex-shrink:0" aria-hidden="true"></i>
+      <input id="q" placeholder="ค้นหา action, target..." style="border:none;outline:none;flex:1;background:none;font-size:var(--text-sm)"
+             oninput="debounce(()=>{ page=1; load(); },300)()" aria-label="ค้นหา Audit Log">
+    </div>
+  </div>
+
+  <div id="count" class="ghost small mb2"></div>
+  <div id="list" class="stagger">
+    <div class="skeleton" style="height:64px;border-radius:var(--radius-lg)"></div>
+    <div class="skeleton mt2" style="height:64px;border-radius:var(--radius-lg)"></div>
+    <div class="skeleton mt2" style="height:64px;border-radius:var(--radius-lg)"></div>
+    <div class="skeleton mt2" style="height:64px;border-radius:var(--radius-lg)"></div>
+  </div>
+  <div id="pagination" class="row gap2 mt3 center" style="justify-content:center"></div>
+</div>
+{% endblock %}
+{% block script %}<script>
+let page = 1, totalPages = 1;
+const PER_PAGE = 20;
+
+const ACTION_COLOR = {
+  DELETE_USER:    "var(--danger-ink)",
+  DELETE_MARKET:  "var(--danger-ink)",
+  DELETE_REVIEW:  "var(--danger-ink)",
+  SUSPEND_USER:   "var(--warn-ink)",
+  VERIFY_MARKET:  "var(--success-ink)",
+  FEATURE_MARKET: "#f59e0b",
+  ADMIN_LOGIN:    "#7950f2",
+  CREATE_USER:    "var(--success-ink)",
+};
+
+async function load() {
+  const q = ($("#q") && $("#q").value.trim()) || "";
+  const list = $("#list"), cnt = $("#count"), pg = $("#pagination");
+  const p = new URLSearchParams({ page, per_page: PER_PAGE });
+  if (q) p.set("q", q);
+  const d = await API.get("/admin/audit?" + p.toString());
+  const logs = d.logs || [];
+  totalPages = d.pages || 1;
+
+  if (cnt) cnt.textContent = `แสดง ${logs.length} รายการ (หน้า ${page}/${totalPages})`;
+
+  if (!logs.length) {
+    list.innerHTML = `<div class="muted center-text card pad">ไม่มีบันทึก</div>`;
+    if (pg) pg.innerHTML = "";
+    return;
+  }
+
+  list.innerHTML = logs.map(l => {
+    const color = ACTION_COLOR[l.action] || "var(--ink-soft)";
+    const metaStr = l.meta && Object.keys(l.meta).length
+      ? Object.entries(l.meta).map(([k,v]) => `<span class="ghost small">${k}: ${esc(String(v))}</span>`).join(" · ")
+      : "";
+    return `<div class="card pad mt2" style="border-left:3px solid ${color}">
+      <div class="between mb1">
+        <span class="bold sub" style="color:${color}">${esc(l.action)}</span>
+        <span class="ghost" style="font-size:.65rem;white-space:nowrap">${fmtDate(l.createdAt)} ${fmtTime(l.createdAt)}</span>
+      </div>
+      <div class="muted small">
+        โดย ${esc(l.actorName || l.actorId || "—")} (${esc(l.actorRole || "—")})
+        ${l.targetName ? ` · เป้าหมาย: ${esc(l.targetName)}` : ""}
+        ${l.targetType ? ` [${esc(l.targetType)}]` : ""}
+      </div>
+      ${metaStr ? `<div class="mt1">${metaStr}</div>` : ""}
+    </div>`;
+  }).join("");
+  icons(list);
+
+  // Pagination
+  if (pg) {
+    const btns = [];
+    if (page > 1) btns.push(`<button class="btn btn-ghost btn-sm" onclick="goPage(${page-1})" type="button">← ก่อนหน้า</button>`);
+    btns.push(`<span class="ghost small" style="padding:0 var(--s2)">หน้า ${page}/${totalPages}</span>`);
+    if (page < totalPages) btns.push(`<button class="btn btn-ghost btn-sm" onclick="goPage(${page+1})" type="button">ถัดไป →</button>`);
+    pg.innerHTML = btns.join("");
+  }
+}
+
+function goPage(p) { page = p; load(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+
+load();
+</script>{% endblock %}

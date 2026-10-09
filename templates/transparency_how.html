@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}สูตรและหลักการจัดสรร — {{ app_name }}{% endblock %}
+{% block head %}
+<style>
+.how-section { background:var(--surface);border-radius:var(--radius-lg);padding:24px;margin-bottom:20px;border:1px solid var(--line); }
+.formula-box { background:var(--bg);border-radius:var(--radius);padding:20px 24px;font-family:monospace;font-size:.92rem;line-height:2;border-left:4px solid var(--brand);overflow-x:auto; }
+.weight-row { display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line); }
+.weight-row:last-child { border-bottom:none; }
+.weight-bar-wrap { flex:1;background:var(--bg);border-radius:4px;height:10px;overflow:hidden;min-width:80px; }
+.weight-bar { height:100%;border-radius:4px;transition:.3s; }
+.weight-label { font-weight:700;min-width:40px;text-align:right; }
+.step-num { width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;flex-shrink:0; }
+.example-table { width:100%;border-collapse:collapse;font-size:.85rem; }
+.example-table th { background:var(--bg-2);padding:8px 12px;text-align:left;border-bottom:2px solid var(--line); }
+.example-table td { padding:8px 12px;border-bottom:1px solid var(--line); }
+.highlight-row td { background:hsl(142,60%,96%);font-weight:600; }
+[data-theme=dark] .highlight-row td { background:hsl(142,30%,15%); }
+.lottery-box { background:hsl(168,50%,96%);border-radius:var(--radius);padding:18px 20px;border-left:4px solid hsl(168,70%,36%);font-family:monospace;font-size:.85rem;line-height:1.8; }
+[data-theme=dark] .lottery-box { background:hsl(168,30%,12%); }
+</style>
+{% endblock %}
+{% block body %}
+{% with title='สูตรและหลักการจัดสรร', subtitle='ทำความเข้าใจว่าระบบตัดสินใจอย่างไร' %}{% include "_appheader.html" %}{% endwith %}
+
+<div class="page-pad">
+  <div style="margin-bottom:12px">
+    <a href="/transparency" class="btn btn-ghost btn-sm">
+      <i data-lucide="arrow-left" style="width:15px;height:15px"></i> กลับหน้าบันทึก
+    </a>
+  </div>
+
+  {# Overview #}
+  <div class="how-section">
+    <div class="h3 mb3">ภาพรวม: ทำไมต้องมีระบบจัดสรรที่โปร่งใส?</div>
+    <div class="sub" style="line-height:1.8">
+      ระบบเดิมที่ "ใครจ่ายก่อนได้ก่อน" สร้างความไม่เป็นธรรมให้ผู้ค้ารายย่อยที่ไม่มีเวลาหน้าจอ
+      Smart Hawker ใช้ <b>สูตรคะแนน (Scoring)</b> และ <b>สลากตรวจสอบได้ (Verifiable Lottery)</b>
+      ในการตัดสินใจแทน โดยเน้น 3 มิติ ได้แก่ <b>ความยาวนานการรอคิว</b>, <b>การหมุนเวียนพื้นที่</b>,
+      และ <b>โควตาผู้ค้ารายย่อย</b>
+    </div>
+  </div>
+
+  {# Scoring Formula #}
+  <div class="how-section">
+    <div class="h3 mb4">สูตรคะแนน (Scoring Formula)</div>
+    <div class="formula-box mb4">
+score = W_WAIT × days_waiting<br>
+      + W_ROTATION × rotation_bonus<br>
+      + W_QUOTA × quota_bonus<br><br>
+W_WAIT     = <b>0.5</b>  (50%)<br>
+W_ROTATION = <b>0.3</b>  (30%)<br>
+W_QUOTA    = <b>0.2</b>  (20%)
+    </div>
+
+    {# Weight bars #}
+    <div class="weight-row">
+      <div class="step-num" style="background:var(--brand-soft);color:var(--brand)">W1</div>
+      <div class="flex1">
+        <div class="bold sub">W_WAIT — ระยะเวลารอคิว (50%)</div>
+        <div class="muted" style="font-size:.8rem">นับจากวันสมัครถึงวันจัดสรร สูงสุด 30 วัน (+15 คะแนน max)</div>
+        <div class="weight-bar-wrap mt1">
+          <div class="weight-bar" style="width:50%;background:var(--brand)"></div>
+        </div>
+      </div>
+      <div class="weight-label" style="color:var(--brand)">50%</div>
+    </div>
+    <div class="weight-row">
+      <div class="step-num" style="background:hsl(168,50%,90%);color:hsl(168,70%,30%)">W2</div>
+      <div class="flex1">
+        <div class="bold sub">W_ROTATION — โบนัสหมุนเวียน (30%)</div>
+        <div class="muted" style="font-size:.8rem">คนที่จอง 0 ครั้งใน 90 วันได้ +10 คะแนน; จอง 10+ ครั้งได้ 0 คะแนน</div>
+        <div class="weight-bar-wrap mt1">
+          <div class="weight-bar" style="width:30%;background:hsl(168,70%,36%)"></div>
+        </div>
+      </div>
+      <div class="weight-label" style="color:hsl(168,70%,36%)">30%</div>
+    </div>
+    <div class="weight-row">
+      <div class="step-num" style="background:hsl(38,100%,90%);color:hsl(38,80%,35%)">W3</div>
+      <div class="flex1">
+        <div class="bold sub">W_QUOTA — โควตาผู้ค้ารายย่อย (20%)</div>
+        <div class="muted" style="font-size:.8rem">ผู้ค้า SELLER ที่ไม่ได้จองใน 30 วันล่าสุด ได้ +5 คะแนนโควตา</div>
+        <div class="weight-bar-wrap mt1">
+          <div class="weight-bar" style="width:20%;background:hsl(38,80%,50%)"></div>
+        </div>
+      </div>
+      <div class="weight-label" style="color:hsl(38,80%,35%)">20%</div>
+    </div>
+  </div>
+
+  {# Example calculation #}
+  <div class="how-section">
+    <div class="h3 mb3">ตัวอย่างการคำนวณ</div>
+    <div class="sub mb3">ผู้สมัคร 3 คนแข่งขันล็อก A5 ตลาดคลองเตย:</div>
+    <div style="overflow-x:auto">
+      <table class="example-table">
+        <thead>
+          <tr>
+            <th>ชื่อ</th>
+            <th>รอนาน (วัน)</th>
+            <th>จอง 90 วัน</th>
+            <th>จอง 30 วัน</th>
+            <th>W_WAIT ×0.5</th>
+            <th>W_ROTATION ×0.3</th>
+            <th>W_QUOTA ×0.2</th>
+            <th>คะแนนรวม</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>สมชาย</td><td>25</td><td>2</td><td>1</td>
+            <td>12.5</td><td>2.4</td><td>0</td><td>14.9</td>
+          </tr>
+          <tr class="highlight-row">
+            <td>มาลี ⭐</td><td>28</td><td>0</td><td>0</td>
+            <td>14.0</td><td>3.0</td><td>1.0</td><td><b>18.0</b></td>
+          </tr>
+          <tr>
+            <td>ประยุทธ</td><td>10</td><td>8</td><td>2</td>
+            <td>5.0</td><td>0.6</td><td>0</td><td>5.6</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="muted sub mt3" style="font-size:.82rem">
+      มาลีได้รับการจัดสรรล็อก A5 เพราะรอนานที่สุด (28 วัน) + ไม่เคยได้ล็อกใน 90 วัน + อยู่ในโควตารายย่อย
+    </div>
+  </div>
+
+  {# Lottery Mode #}
+  <div class="how-section">
+    <div class="h3 mb3" style="color:hsl(168,70%,36%)">โหมดสลาก (Verifiable Lottery)</div>
+    <div class="sub mb3">เมื่อผู้สมัครมีคะแนนเท่ากัน หรือ admin เลือกใช้ โหมดสลากจะถูกใช้แทน Scoring</div>
+    <div class="lottery-box mb3">
+seed_input = lot_id + ":" + date_str + ":" + public_salt<br>
+seed       = SHA256(seed_input).hexdigest()<br><br>
+# ใช้ seed ในการสับลำดับรายชื่อผู้สมัคร<br>
+random.Random(seed).shuffle(applicants)<br><br>
+# ผู้อยู่อันดับ 1 หลังสับ = ผู้ได้รับการจัดสรร
+    </div>
+    <div class="bold sub mb2">ทำไม Verifiable ได้?</div>
+    <ul style="line-height:2;padding-left:20px;color:var(--ink-soft);font-size:.9rem">
+      <li><b>seed สาธารณะ</b> — บันทึกลง allocation_record ทุกครั้ง ทุกคนดูได้</li>
+      <li><b>reproducible</b> — ใส่ seed เดิม + รายชื่อเดิม → ได้ผลเหมือนกันทุกครั้ง 100%</li>
+      <li><b>ตรวจสอบเองได้</b> — python -c "import hashlib, random; ..." ในคอมทุกเครื่อง</li>
+      <li><b>ห้ามย้อนหลัง</b> — เปลี่ยน seed หลังจากสุ่มแล้วทำให้ได้ผลต่างกัน ตรวจจับได้ทันที</li>
+    </ul>
+  </div>
+
+  {# AUTO_BOOKING #}
+  <div class="how-section">
+    <div class="h3 mb3">AUTO_BOOKING — การจองผ่านระบบปกติ</div>
+    <div class="sub" style="line-height:1.8">
+      เมื่อผู้ค้าจองล็อกผ่านหน้า /book ตามปกติ ระบบจะบันทึก ledger ด้วย method=AUTO_BOOKING
+      โดยอัตโนมัติ หลักการคือ "ใครกดก่อนได้ก่อน" ซึ่งเหมาะกับล็อกทั่วไปที่ไม่มีคิวรอ
+      ดัชนีความโปร่งใสจะสูงขึ้นเมื่อตลาดเปลี่ยนไปใช้ SCORING/LOTTERY มากขึ้น
+    </div>
+  </div>
+
+  {# Transparency Index #}
+  <div class="how-section">
+    <div class="h3 mb3">ดัชนีความโปร่งใส (Transparency Index) 0–100</div>
+    <div class="formula-box mb3">
+index = (ratio_with_reason × 50)<br>
+      + (ratio_scoring_lottery × 30)<br>
+      + (has_zone_data ? 20 : 0)
+    </div>
+    <ul style="line-height:2;padding-left:20px;color:var(--ink-soft);font-size:.9rem">
+      <li><b>50 คะแนน</b> — สัดส่วนการจัดสรรที่มีเหตุผลอ่านออก (reason ไม่ว่าง)</li>
+      <li><b>30 คะแนน</b> — สัดส่วน SCORING+LOTTERY เทียบกับทั้งหมด</li>
+      <li><b>20 คะแนน</b> — ตลาดมีข้อมูลโซนสาธารณะ (ZoneData)</li>
+    </ul>
+    <div class="muted sub" style="font-size:.82rem;margin-top:8px">
+      ตลาดใหม่ที่ยังไม่มีข้อมูลจะได้ 50 คะแนน (default midpoint) จนกว่าจะมีการจัดสรรครั้งแรก
+    </div>
+  </div>
+
+  {# §4 กทม. Integration — short block #}
+  <div class="how-section" style="border-left:4px solid hsl(205,70%,50%)">
+    <div class="h3 mb3" style="display:flex;align-items:center;gap:8px;color:hsl(205,70%,30%)">
+      <i data-lucide="landmark" style="width:20px;height:20px" aria-hidden="true"></i>
+      เชื่อมต่อกับ กทม.
+    </div>
+    <div class="sub mb3" style="line-height:1.8">
+      ระบบ Smart Hawker ออกแบบให้ผนวกกับโครงสร้างข้อมูลภาครัฐ กรุงเทพมหานคร (BMA) ได้โดยตรง:
+    </div>
+    <ul style="line-height:2.1;padding-left:20px;font-size:.9rem">
+      <li>
+        <b>Open Data API</b> — <code>GET /api/open-data/markets</code> &amp; <code>/zones</code>
+        เปิดสาธารณะ CC BY 4.0 &nbsp;
+        <span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:.72rem;font-weight:700;background:hsl(142,60%,90%);color:hsl(142,60%,26%)">Live</span>
+      </li>
+      <li>
+        <b>Traffy Fondue</b> — ดึงเรื่องร้องเรียนรัศมี 300m จากพื้นที่ &nbsp;
+        <span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:.72rem;font-weight:700;background:hsl(38,100%,88%);color:hsl(38,80%,32%)">Mock</span>
+        <span class="muted" style="font-size:.8rem">(ตั้ง <code>TRAFFY_PROVIDER=live</code> เพื่อเปิดจริง)</span>
+      </li>
+      <li>
+        <b>BMA gov_ref</b> — ฟิลด์อ้างอิงทะเบียนพื้นที่ กทม. บนโมเดล Market &nbsp;
+        <span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:.72rem;font-weight:700;background:hsl(205,78%,92%);color:hsl(205,70%,30%)">Demo-ready</span>
+      </li>
+    </ul>
+    <a href="/gov" class="btn btn-ghost btn-sm" style="margin-top:12px">
+      <i data-lucide="landmark" style="width:13px;height:13px"></i> แดชบอร์ด กทม.
+    </a>
+  </div>
+
+  <div style="text-align:center;margin-top:24px">
+    <a href="/transparency" class="btn btn-primary">
+      <i data-lucide="list" style="width:15px;height:15px"></i> ดูบันทึกการจัดสรร
+    </a>
+    <a href="/simulator" class="btn btn-ghost" style="margin-left:8px">
+      <i data-lucide="sliders" style="width:15px;height:15px"></i> ลองจำลองนโยบาย
+    </a>
+  </div>
+</div>
+
+{% with active='transparency' %}{% include "_bottomnav.html" %}{% endwith %}
+{% endblock %}
+{% block script %}<script>
+// icon init is automatic via app.js
+</script>{% endblock %}

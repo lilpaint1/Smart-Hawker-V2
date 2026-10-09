@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}ไม่พบหน้านี้ — {{ app_name }}{% endblock %}
+{% block sidebar %}{% endblock %}
+{% block shell_class %}shell-bare{% endblock %}
+{% block body %}
+<main class="center" style="min-height:100dvh;flex-direction:column;padding:var(--s5)">
+  <div class="center mb4 fadeUp" style="width:96px;height:96px;border-radius:50%;background:var(--brand-soft)" aria-hidden="true">
+    <i data-lucide="compass" style="width:52px;height:52px;color:var(--brand-ink)"></i>
+  </div>
+  <h1 class="h1 center-text fadeUp" style="font-size:5rem;line-height:1;color:var(--brand);animation-delay:.05s">404</h1>
+  <h2 class="h2 center-text mb2 fadeUp" style="animation-delay:.1s">ไม่พบหน้านี้</h2>
+  <p class="muted sub center-text mb6 fadeUp" style="animation-delay:.15s;max-width:320px">
+    หน้าที่คุณต้องการไม่มีอยู่ในระบบ หรืออาจถูกย้ายไปแล้ว
+  </p>
+  <div class="col gap2 fadeUp" style="width:100%;max-width:300px;animation-delay:.2s">
+    <a href="/" class="btn btn-primary btn-block">
+      <i data-lucide="home" style="width:16px;height:16px" aria-hidden="true"></i>
+      กลับหน้าหลัก
+    </a>
+    <a href="/search" class="btn btn-ghost btn-block">
+      <i data-lucide="search" style="width:16px;height:16px" aria-hidden="true"></i>
+      ค้นหาตลาด
+    </a>
+  </div>
+</main>
+{% endblock %}

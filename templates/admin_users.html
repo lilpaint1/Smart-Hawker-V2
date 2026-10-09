@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}จัดการผู้ใช้ — {{ app_name }}{% endblock %}
+{% block body %}
+<div class="topbar">
+  <button class="back" onclick="go('/admin')" aria-label="กลับแดชบอร์ด" type="button">
+    <i data-lucide="chevron-left" aria-hidden="true"></i>
+  </button>
+  <h1>จัดการผู้ใช้</h1>
+  <button class="btn btn-primary btn-sm" onclick="toggleForm()" type="button">
+    <i data-lucide="plus" style="width:15px;height:15px" aria-hidden="true"></i>เพิ่ม
+  </button>
+</div>
+
+<div class="page-pad">
+  {# Add user form #}
+  <div id="form" class="card pad mb4 hide scalein">
+    <div class="label mb3">เพิ่มบัญชีผู้ใช้</div>
+    <div class="col gap3">
+      <div class="form-group">
+        <label class="label" for="f-name">ชื่อ-นามสกุล</label>
+        <input id="f-name" class="input" placeholder="สมหญิง ใจดี">
+      </div>
+      <div class="form-group">
+        <label class="label" for="f-phone">เบอร์โทรศัพท์</label>
+        <input id="f-phone" class="input" inputmode="numeric" maxlength="10" placeholder="08X-XXX-XXXX">
+      </div>
+      <div class="row gap2" role="group" aria-label="ประเภทผู้ใช้">
+        <button id="r-SELLER" class="chip chip-active flex1" style="justify-content:center;padding:.7rem" onclick="pickRole('SELLER')" type="button">ผู้ขาย</button>
+        <button id="r-MARKET_OWNER" class="chip flex1" style="justify-content:center;padding:.7rem" onclick="pickRole('MARKET_OWNER')" type="button">เจ้าของตลาด</button>
+      </div>
+    </div>
+    <div id="err" class="form-err mt2" role="alert" aria-live="polite"></div>
+    <div class="row gap2 mt3">
+      <button class="btn btn-ghost flex1" onclick="toggleForm()" type="button">ยกเลิก</button>
+      <button id="btn-add" class="btn btn-primary flex1" onclick="addUser()" type="button">สร้างบัญชี</button>
+    </div>
+  </div>
+
+  {# Search + filter toolbar #}
+  <div class="row gap2 mb3">
+    <div class="input row gap1 flex1" style="padding:var(--s2) var(--s3)">
+      <i data-lucide="search" style="width:15px;height:15px;color:var(--ink-ghost);flex-shrink:0" aria-hidden="true"></i>
+      <input id="q" placeholder="ค้นหาชื่อหรือเบอร์..." style="border:none;outline:none;flex:1;background:none;font-size:var(--text-sm)"
+             oninput="debounce(load,300)()" aria-label="ค้นหาผู้ใช้">
+    </div>
+    <select id="f-role" class="input" onchange="load()" style="width:auto;min-width:110px" aria-label="กรองตามบทบาท">
+      <option value="">ทุกบทบาท</option>
+      ${Object.entries({SELLER:"ผู้ขาย",MARKET_OWNER:"เจ้าของตลาด"}).map(([v,l]) => `<option value="${v}">${l}</option>`).join("")}
+    </select>
+  </div>
+
+  <div id="count" class="ghost small mb2"></div>
+  <div id="list" class="stagger admin-table">
+    <div class="skeleton" style="height:64px;border-radius:var(--radius-lg)"></div>
+    <div class="skeleton mt2" style="height:64px;border-radius:var(--radius-lg)"></div>
+    <div class="skeleton mt2" style="height:64px;border-radius:var(--radius-lg)"></div>
+  </div>
+</div>
+{% endblock %}
+{% block script %}<script>
+let role = "SELLER";
+function toggleForm() { $("#form").classList.toggle("hide"); }
+function pickRole(r) {
+  role = r;
+  for (const x of ["SELLER","MARKET_OWNER"]) {
+    const el = document.getElementById("r-" + x);
+    if (el) el.classList.toggle("chip-active", x === r);
+  }
+}
+
+async function addUser() {
+  const name  = ($("#f-name") && $("#f-name").value.trim()) || "";
+  const phone = ($("#f-phone") && $("#f-phone").value.replace(/\D/g,"")) || "";
+  const errEl = $("#err"), btn = $("#btn-add");
+  if (name.length < 2)    { if (errEl) errEl.textContent = "กรุณากรอกชื่อ"; return; }
+  if (phone.length !== 10){ if (errEl) errEl.textContent = "เบอร์ต้องเป็นตัวเลข 10 หลัก"; return; }
+  setBtnLoading(btn, true);
+  const d = await API.post("/admin/users", { name, phone, role });
+  setBtnLoading(btn, false);
+  if (!d.ok) { if (errEl) errEl.textContent = d.error || "เกิดข้อผิดพลาด"; return; }
+  Toast.success("สร้างบัญชีแล้ว");
+  if (errEl) errEl.textContent = "";
+  const fn = $("#f-name"), fp = $("#f-phone");
+  if (fn) fn.value = ""; if (fp) fp.value = "";
+  toggleForm();
+  load();
+}
+
+async function load() {
+  const q = ($("#q") && $("#q").value.trim()) || "";
+  const filterRole = ($("#f-role") && $("#f-role").value) || "";
+  const list = $("#list"), cnt = $("#count");
+  if (!q && !filterRole) list.innerHTML = skelCards(3);
+  const p = new URLSearchParams();
+  if (q) p.set("q", q);
+  if (filterRole) p.set("role", filterRole);
+  const d = await API.get("/admin/users?" + p.toString());
+  const users = d.users || [];
+  if (cnt) cnt.textContent = `ทั้งหมด ${users.length} บัญชี`;
+  if (!users.length) {
+    list.innerHTML = `<div class="muted center-text card pad mt2">ไม่พบผู้ใช้</div>`;
+    return;
+  }
+  list.innerHTML = users.map(u => {
+    const isOwner = u.role === "MARKET_OWNER";
+    const bg = isOwner ? "#ecfdf5" : "var(--brand-soft)";
+    const color = isOwner ? "var(--success-ink)" : "var(--brand-ink)";
+    const icon = isOwner ? "building-2" : "store";
+    return `<div class="card pad row gap3 mt2" style="align-items:center">
+      <div style="width:42px;height:42px;border-radius:var(--radius-full);background:${bg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i data-lucide="${icon}" style="width:18px;height:18px;color:${color}" aria-hidden="true"></i>
+      </div>
+      <div class="flex1" style="min-width:0">
+        <div class="row gap1">
+          <span class="bold truncate">${esc(u.name)}</span>
+          ${u.is_suspended ? `<span class="chip chip-danger chip-sm">ระงับ</span>` : ""}
+          ${u.is_verified  ? `<span class="chip chip-sm" style="background:var(--success-soft);color:var(--success-ink)">ยืนยันแล้ว</span>` : ""}
+        </div>
+        <div class="muted small">${esc(u.phone)} · ${esc(C.ROLE_LABEL[u.role] || u.role)}</div>
+        <div class="ghost" style="font-size:.65rem">ตลาด ${u.markets || 0} · จอง ${u.bookings || 0}</div>
+      </div>
+      <div class="row gap1">
+        <button class="btn btn-icon sm" type="button"
+                data-action="suspend" data-uid="${escAttr(u.id)}" data-suspended="${u.is_suspended ? 1 : 0}"
+                aria-label="${u.is_suspended ? "ยกเลิกระงับ" : "ระงับ"}บัญชี ${escAttr(u.name)}"
+                title="${u.is_suspended ? "ยกเลิกระงับ" : "ระงับบัญชี"}"
+                style="border:1px solid var(--line);color:${u.is_suspended ? "var(--success-ink)" : "var(--warn-ink)"}">
+          <i data-lucide="${u.is_suspended ? "user-check" : "user-x"}" style="width:14px;height:14px" aria-hidden="true"></i>
+        </button>
+        <button class="btn btn-icon sm" type="button"
+                data-action="del" data-uid="${escAttr(u.id)}" data-uname="${escAttr(u.name)}"
+                aria-label="ลบบัญชี ${escAttr(u.name)}"
+                style="border:1px solid var(--line);color:var(--danger-ink)">
+          <i data-lucide="trash-2" style="width:14px;height:14px" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>`;
+  }).join("");
+  icons(list);
+}
+
+async function toggleSuspend(id, isSuspended) {
+  const d = await API.patch("/admin/users/" + id, { isSuspended: !isSuspended });
+  if (!d.ok) { Toast.error(d.error); return; }
+  Toast.success(isSuspended ? "ยกเลิกระงับบัญชีแล้ว" : "ระงับบัญชีแล้ว");
+  load();
+}
+
+async function delUser(id, name) {
+  if (!await confirmDialog(`ลบบัญชี "${name}" และข้อมูลทั้งหมด? การกระทำนี้ไม่สามารถย้อนกลับได้`, { title: "ลบบัญชีผู้ใช้" })) return;
+  const d = await API.del("/admin/users/" + id);
+  if (!d.ok) { Toast.error(d.error); return; }
+  Toast.success("ลบบัญชีแล้ว");
+  load();
+}
+
+// Event delegation — no user data in onclick strings
+document.getElementById("list").addEventListener("click", e => {
+  const btn = e.target.closest("[data-action]");
+  if (!btn) return;
+  const { action, uid, suspended, uname } = btn.dataset;
+  if (action === "suspend") toggleSuspend(uid, suspended === "1");
+  if (action === "del")     delUser(uid, uname);
+});
+
+load();
+</script>{% endblock %}

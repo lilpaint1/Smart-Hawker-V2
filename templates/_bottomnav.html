@@ -1,0 +1,109 @@
+{# _bottomnav.html — Mobile bottom tab bar (hidden on desktop ≥1024px, tablet ≥768px via CSS)
+   ตั้ง {% set active = 'search' %} ก่อน include
+   Role-aware: SELLER / MARKET_OWNER / guest
+   "เพิ่มเติม" opens a transparency sheet (#more-sheet)
+#}
+<nav class="bottomnav hide-desktop" aria-label="เมนูล่าง" role="navigation">
+  {% if session_role == 'MARKET_OWNER' %}
+    <a href="/owner"         class="{{ 'active' if active=='owner' }}"     aria-label="พื้นที่ของฉัน" aria-current="{{ 'page' if active=='owner' }}">
+      <i data-lucide="building-2"></i>พื้นที่
+    </a>
+    <a href="/chat"          class="{{ 'active' if active=='chat' }}"      aria-label="แชท" aria-current="{{ 'page' if active=='chat' }}">
+      <i data-lucide="message-circle"></i>แชท
+    </a>
+    <a href="/notifications" class="{{ 'active' if active=='notif' }}"     aria-label="แจ้งเตือน" aria-current="{{ 'page' if active=='notif' }}">
+      <i data-lucide="bell"></i>แจ้งเตือน
+      <span id="bell-badge" class="badge-dot hide" style="display:none"></span>
+    </a>
+    <a href="/profile"       class="{{ 'active' if active=='profile' }}"   aria-label="โปรไฟล์" aria-current="{{ 'page' if active=='profile' }}">
+      <i data-lucide="user"></i>โปรไฟล์
+    </a>
+    <button class="{{ 'active' if active=='more' }}" onclick="openMoreSheet()" aria-label="โปร่งใส" type="button"
+            style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:var(--s2) 0;background:none;border:none;color:var(--ink-soft);font-size:var(--text-xs);font-weight:700;cursor:pointer;min-height:56px;font-family:inherit">
+      <i data-lucide="more-horizontal" style="width:22px;height:22px"></i>เพิ่มเติม
+    </button>
+  {% elif session_role == 'ADMIN' %}
+    <a href="/admin"         class="{{ 'active' if active=='admin' }}"     aria-label="แดชบอร์ด">
+      <i data-lucide="layout-dashboard"></i>แดชบอร์ด
+    </a>
+    <a href="/admin/markets" class="{{ 'active' if active=='markets' }}"   aria-label="พื้นที่">
+      <i data-lucide="store"></i>พื้นที่
+    </a>
+    <a href="/admin/users"   class="{{ 'active' if active=='users' }}"     aria-label="ผู้ใช้">
+      <i data-lucide="users"></i>ผู้ใช้
+    </a>
+    <button class="{{ 'active' if active=='more' }}" onclick="openMoreSheet()" aria-label="โปร่งใส" type="button"
+            style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:var(--s2) 0;background:none;border:none;color:var(--ink-soft);font-size:var(--text-xs);font-weight:700;cursor:pointer;min-height:56px;font-family:inherit">
+      <i data-lucide="more-horizontal" style="width:22px;height:22px"></i>เพิ่มเติม
+    </button>
+  {% else %}
+    <a href="/search"   class="{{ 'active' if active=='search' }}"   aria-label="ค้นหา" aria-current="{{ 'page' if active=='search' }}">
+      <i data-lucide="search"></i>ค้นหา
+    </a>
+    <a href="/map"      class="{{ 'active' if active=='map' }}"      aria-label="แผนที่" aria-current="{{ 'page' if active=='map' }}">
+      <i data-lucide="map"></i>แผนที่
+    </a>
+    {% if me %}
+    <a href="/bookings" class="{{ 'active' if active=='bookings' }}" aria-label="การจอง" aria-current="{{ 'page' if active=='bookings' }}">
+      <i data-lucide="calendar-check"></i>การจอง
+    </a>
+    {% endif %}
+    {% if me %}
+    <a href="/profile"  class="{{ 'active' if active=='profile' }}"  aria-label="โปรไฟล์" aria-current="{{ 'page' if active=='profile' }}">
+      <i data-lucide="user"></i>โปรไฟล์
+    </a>
+    {% else %}
+    <a href="/login"    class="{{ 'active' if active=='login' }}"    aria-label="เข้าสู่ระบบ" aria-current="{{ 'page' if active=='login' }}">
+      <i data-lucide="log-in"></i>เข้าสู่ระบบ
+    </a>
+    {% endif %}
+    <button class="{{ 'active' if active=='more' }}" onclick="openMoreSheet()" aria-label="โปร่งใส" type="button"
+            style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:var(--s2) 0;background:none;border:none;color:var(--ink-soft);font-size:var(--text-xs);font-weight:700;cursor:pointer;min-height:56px;font-family:inherit">
+      <i data-lucide="more-horizontal" style="width:22px;height:22px"></i>โปร่งใส
+    </button>
+  {% endif %}
+</nav>
+
+{# More sheet — transparency links (phone only, shown by JS) #}
+<div id="more-sheet-backdrop" onclick="closeMoreSheet()"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200"></div>
+<div id="more-sheet"
+     style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:201;
+            background:var(--surface);border-radius:var(--radius-xl) var(--radius-xl) 0 0;
+            padding:var(--s4) var(--s5) calc(var(--s6) + env(safe-area-inset-bottom,0px));
+            box-shadow:0 -8px 40px rgba(0,0,0,.18)">
+  <div style="width:40px;height:4px;border-radius:2px;background:var(--line-2);margin:0 auto var(--s4)"></div>
+  <div style="font-size:.78rem;font-weight:700;color:var(--ink-ghost);text-transform:uppercase;letter-spacing:.06em;margin-bottom:var(--s3)">
+    ความโปร่งใส (Transparency)
+  </div>
+  {% set more_links = [
+    ('/transparency',              'scroll-text',       'บัญชีการจัดสรร (Ledger)',    'ตรวจสอบทุกการจัดสรรพื้นที่'),
+    ('/transparency/how-it-works', 'scale',             'วิธีจัดสรรอย่างเป็นธรรม',   'สูตรและหลักการให้คะแนน'),
+    ('/gov',                       'landmark',          'แดชบอร์ด กทม.',              'ข้อมูลสรุปเชิงนโยบาย'),
+    ('/simulator',                 'sliders-horizontal','จำลองนโยบาย',               'ปรับพารามิเตอร์ดูผลกระทบ'),
+    ('/map',                       'map',               'แผนที่ + ความหนาแน่น',      'พื้นที่และข้อมูลโซน'),
+  ] %}
+  {% for href, icon, label, desc in more_links %}
+  <a href="{{ href }}" onclick="closeMoreSheet()"
+     style="display:flex;align-items:center;gap:var(--s3);padding:var(--s3) 0;border-bottom:1px solid var(--line);text-decoration:none;color:var(--ink)">
+    <div style="width:38px;height:38px;border-radius:var(--radius-sm);background:var(--brand-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      <i data-lucide="{{ icon }}" style="width:18px;height:18px;color:var(--brand-ink)"></i>
+    </div>
+    <div>
+      <div style="font-weight:700;font-size:.9rem">{{ label }}</div>
+      <div style="font-size:.78rem;color:var(--ink-soft)">{{ desc }}</div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+<script>
+function openMoreSheet(){
+  document.getElementById("more-sheet-backdrop").style.display="block";
+  document.getElementById("more-sheet").style.display="block";
+  icons(document.getElementById("more-sheet"));
+}
+function closeMoreSheet(){
+  document.getElementById("more-sheet-backdrop").style.display="none";
+  document.getElementById("more-sheet").style.display="none";
+}
+</script>

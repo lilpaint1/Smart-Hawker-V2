@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}แชท — {{ app_name }}{% endblock %}
+{% block body %}
+<div class="topbar">
+  <button class="back" onclick="go('/chat')" aria-label="กลับรายการแชท" type="button">
+    <i data-lucide="chevron-left" aria-hidden="true"></i>
+  </button>
+  <div class="row gap2 flex1" style="min-width:0">
+    <div id="other-avatar" class="avatar" style="width:32px;height:32px;font-size:.85rem;flex-shrink:0" aria-hidden="true">?</div>
+    <h1 id="other-name" class="truncate" style="font-size:var(--text-base)">แชท</h1>
+  </div>
+</div>
+
+<main class="col" style="height:calc(100dvh - var(--topbar-h))">
+  <div id="msgs" class="flex1 col gap2" role="log" aria-live="polite" aria-label="ข้อความ"
+       style="overflow-y:auto;padding:var(--s4);scroll-behavior:smooth">
+    <div class="center muted small" style="padding:var(--s4)">
+      <i data-lucide="loader-circle" style="width:24px;height:24px;animation:spin 1s linear infinite"></i>
+    </div>
+  </div>
+
+  <form class="row gap2" style="padding:var(--s3) var(--s4);background:var(--surface);border-top:1px solid var(--line)"
+        onsubmit="send(event)" role="form" aria-label="ส่งข้อความ">
+    <input id="text" class="input flex1" placeholder="พิมพ์ข้อความ..."
+           autocomplete="off" enterkeyhint="send" aria-label="ข้อความ"
+           style="min-height:40px">
+    <button class="btn btn-primary" type="submit"
+            style="padding:var(--s2) var(--s4);min-height:40px"
+            aria-label="ส่งข้อความ">
+      <i data-lucide="send" style="width:16px;height:16px" aria-hidden="true"></i>
+    </button>
+  </form>
+</main>
+{% endblock %}
+{% block script %}<script>
+const OTHER  = "{{ other_id }}";
+const MY_ID  = ME ? String(ME.id) : null;
+const THREAD_ID = MY_ID ? [MY_ID, OTHER].sort().join("__") : OTHER;
+let lastTimestamp = null, pollTimer = null, otherName = "ผู้ใช้", optimisticCount = 0;
+
+async function loadOtherUser() {
+  const d = await API.get("/users/" + OTHER);
+  if (!d.ok) return;
+  const u = d.user;
+  otherName = u.shopName || u.name || "ผู้ใช้";
+  const nameEl = $("#other-name");
+  if (nameEl) nameEl.textContent = otherName;
+  const avatarEl = $("#other-avatar");
+  if (avatarEl) {
+    avatarEl.textContent = otherName.charAt(0);
+    avatarEl.style.background = avaColor(otherName);
+  }
+}
+
+function msgHTML(m) {
+  const mine = String(m.fromUserId) === MY_ID || m.mine;
+  return `<div class="bubble ${mine ? "me" : "them"}" role="article"
+               aria-label="${mine ? "ฉัน" : esc(otherName)}: ${esc(m.body)}"
+               style="animation:fadeUp .15s ease">
+    ${esc(m.body)}
+    <span class="ghost" style="font-size:.65rem;margin-left:var(--s2);opacity:.7" aria-hidden="true">${fmtTime(m.createdAt)}</span>
+  </div>`;
+}
+
+async function loadMessages(initial) {
+  const url = "/messages?threadId=" + THREAD_ID + (lastTimestamp ? "&since=" + encodeURIComponent(lastTimestamp) : "");
+  const d = await API.get(url);
+  if (!d.ok) return;
+  const msgs = d.messages || [];
+  if (!msgs.length && !initial) return;
+
+  const box = $("#msgs");
+  const wasAtBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+
+  if (initial) {
+    if (!msgs.length) {
+      box.innerHTML = `<div class="center muted small" style="padding:var(--s4)">เริ่มบทสนทนากัน!</div>`;
+    } else {
+      box.innerHTML = msgs.map(msgHTML).join("");
+    }
+  } else {
+    msgs.forEach(m => {
+      const el = document.createElement("div");
+      el.innerHTML = msgHTML(m);
+      box.appendChild(el.firstElementChild);
+    });
+  }
+
+  if (msgs.length) {
+    lastTimestamp = msgs[msgs.length - 1].createdAt;
+  }
+
+  if (initial || wasAtBottom) {
+    box.scrollTop = box.scrollHeight;
+  }
+  icons(box);
+}
+
+async function send(e) {
+  if (e) e.preventDefault();
+  const input = $("#text");
+  const body = (input && input.value.trim()) || "";
+  if (!body) return;
+  input.value = "";
+  input.focus();
+
+  const box = $("#msgs");
+  const now = new Date().toISOString();
+  const optimisticId = "opt-" + (++optimisticCount);
+  const el = document.createElement("div");
+  el.id = optimisticId;
+  el.innerHTML = msgHTML({ fromUserId: MY_ID, mine: true, body, createdAt: now });
+  box.appendChild(el.firstElementChild);
+  box.scrollTop = box.scrollHeight;
+
+  const d = await API.post("/messages", { toUserId: OTHER, body });
+  if (!d.ok) {
+    Toast.error(d.error || "ส่งข้อความไม่สำเร็จ");
+    const optEl = document.getElementById(optimisticId);
+    if (optEl) optEl.remove();
+    return;
+  }
+  lastTimestamp = now;
+}
+
+function startPolling() {
+  clearInterval(pollTimer);
+  pollTimer = setInterval(() => loadMessages(false), 3000);
+}
+
+loadOtherUser();
+loadMessages(true).then(startPolling);
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    clearInterval(pollTimer);
+  } else {
+    loadMessages(false);
+    startPolling();
+  }
+});
+</script>{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}การแจ้งเตือน — {{ app_name }}{% endblock %}
+{% block body %}
+<div class="topbar">
+  <button class="back" onclick="history.back()" aria-label="กลับ" type="button">
+    <i data-lucide="chevron-left" aria-hidden="true"></i>
+  </button>
+  <h1>การแจ้งเตือน</h1>
+  <button class="btn btn-ghost btn-sm" onclick="markAll()" type="button" id="mark-all-btn"
+          style="min-height:0;font-size:var(--text-xs)">
+    อ่านทั้งหมด
+  </button>
+</div>
+
+<main class="page-pad" id="list" role="feed" aria-label="รายการแจ้งเตือน">
+  <div class="skeleton mt2" style="height:72px;border-radius:var(--radius-lg)"></div>
+  <div class="skeleton mt2" style="height:72px;border-radius:var(--radius-lg)"></div>
+  <div class="skeleton mt2" style="height:72px;border-radius:var(--radius-lg)"></div>
+</main>
+{% endblock %}
+{% block script %}<script>
+const ICON_MAP = {
+  BOOKING_CONFIRMED: ["check-circle-2", "var(--success-ink)"],
+  BOOKING_PENDING:   ["clock",          "var(--warn-ink)"],
+  BOOKING_CANCELLED: ["x-circle",       "var(--danger-ink)"],
+  MESSAGE:           ["message-circle", "#0ea5e9"],
+  PROMO:             ["tag",            "#f59e0b"],
+  REVIEW:            ["star",           "#f59e0b"],
+  SYSTEM:            ["bell",           "var(--ink-soft)"],
+};
+
+let notifications = [];
+
+async function load() {
+  const list = $("#list");
+  const d = await API.get("/notifications");
+  notifications = d.notifications || [];
+
+  if (!notifications.length) {
+    list.innerHTML = `<div class="card pad center-text muted mt4">
+      <i data-lucide="bell-off" style="width:48px;height:48px;color:var(--ink-ghost)"></i>
+      <div class="h3 mt3">ไม่มีการแจ้งเตือน</div>
+      <div class="small mt1">เราจะแจ้งคุณเมื่อมีข้อมูลใหม่</div>
+    </div>`;
+    icons(list);
+    return;
+  }
+
+  list.innerHTML = `<div class="between mb3">
+    <span class="ghost small">${notifications.length} การแจ้งเตือน</span>
+  </div>` + notifications.map(n => {
+    const [icon, color] = ICON_MAP[n.type] || ICON_MAP.SYSTEM;
+    const unread = !n.isRead;
+    return `<div class="card pad row gap3 mt2" style="align-items:flex-start;${unread ? "border-left:3px solid var(--brand)" : ""}">
+      <div style="width:36px;height:36px;border-radius:var(--radius-full);background:${color}20;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i data-lucide="${icon}" style="width:18px;height:18px;color:${color}" aria-hidden="true"></i>
+      </div>
+      <div class="flex1" style="min-width:0">
+        <div class="between">
+          <div class="bold sub ${unread ? "" : "muted"}">${esc(n.title)}</div>
+          ${unread ? `<span class="badge-dot" aria-label="ยังไม่อ่าน"></span>` : ""}
+        </div>
+        <div class="muted small mt1">${esc(n.body)}</div>
+        <div class="ghost mt1" style="font-size:.65rem">${fmtDate(n.createdAt)} ${fmtTime(n.createdAt)}</div>
+        ${n.link ? `<a href="${esc(n.link)}" class="btn btn-soft btn-sm mt2" style="display:inline-flex">ดูรายละเอียด</a>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+  icons(list);
+}
+
+async function markAll() {
+  const btn = $("#mark-all-btn");
+  setBtnLoading(btn, true);
+  await API.post("/notifications");
+  setBtnLoading(btn, false);
+  Toast.success("ทำเครื่องหมายอ่านทั้งหมดแล้ว");
+  refreshBell && refreshBell();
+  load();
+}
+
+load();
+</script>{% endblock %}

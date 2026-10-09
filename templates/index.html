@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+{% block title %}{{ app_name }} — เปิดพื้นที่ให้ค้าขาย{% endblock %}
+{% block body %}
+{# Homepage — public, no auth required
+   Real data loaded via JS (API.get) #}
+
+{# ===== HERO ===== #}
+<section class="hero" aria-label="จุดเริ่มต้น">
+  <div style="max-width:640px;margin:0 auto">
+
+    {# Logo #}
+    <div class="center mb3 fadeup">
+      <a href="/" aria-label="{{ app_name }} — หน้าแรก">
+        <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="{{ app_name }}"
+             width="56" height="56" style="width:56px;height:56px;display:block">
+      </a>
+    </div>
+
+    <div class="hero-badge fadeup" style="animation-delay:.04s">
+      <i data-lucide="landmark" style="width:14px;height:14px" aria-hidden="true"></i>
+      <span>เปิดโดยภาครัฐและเอกชน &middot; ทั่วกรุงเทพฯ</span>
+    </div>
+    <h1 class="h1 fadeup" style="animation-delay:.08s;font-size:clamp(1.9rem,5.5vw,3rem);line-height:1.1;margin-bottom:var(--s3)">
+      เปิดพื้นที่<br>ให้ค้าขาย
+    </h1>
+    <p class="muted fadeup" style="animation-delay:.13s;font-size:var(--text-lg);max-width:460px;margin:0 auto var(--s2)">
+      แพลตฟอร์มเปิดพื้นที่ว่างให้พ่อค้าแม่ค้ารายย่อยมาเปิดล็อกขายของ<br>
+      จัดสรรอย่างโปร่งใส เป็นธรรม ส่งเสริมเศรษฐกิจในพื้นที่
+    </p>
+    <p class="fadeup" style="animation-delay:.16s;font-size:.78rem;margin:0 auto var(--s5);color:var(--ink-ghost)">
+      เหมาะสำหรับเจ้าของพื้นที่ทั้งภาครัฐและเอกชน
+    </p>
+
+    {# 3 Pillars #}
+    <div class="row gap3 fadeup" style="animation-delay:.20s;justify-content:center;flex-wrap:wrap;margin-bottom:var(--s6)">
+      <div class="row gap1" style="align-items:center;font-size:.8rem">
+        <i data-lucide="shield-check" style="width:15px;height:15px;color:var(--accent);flex-shrink:0" aria-hidden="true"></i>
+        <span>โปร่งใส / ตรวจสอบได้</span>
+      </div>
+      <span style="color:var(--line)" aria-hidden="true">&middot;</span>
+      <div class="row gap1" style="align-items:center;font-size:.8rem">
+        <i data-lucide="scale" style="width:15px;height:15px;color:var(--brand);flex-shrink:0" aria-hidden="true"></i>
+        <span>เป็นธรรม (ไม่ยึดทำเลทอง)</span>
+      </div>
+      <span style="color:var(--line)" aria-hidden="true">&middot;</span>
+      <div class="row gap1" style="align-items:center;font-size:.8rem">
+        <i data-lucide="heart-handshake" style="width:15px;height:15px;color:var(--success);flex-shrink:0" aria-hidden="true"></i>
+        <span>ไม่ทิ้งใครไว้ข้างหลัง</span>
+      </div>
+    </div>
+
+    {# Hero search bar #}
+    <a href="/search" class="hero-search fadeup" style="animation-delay:.24s" aria-label="ค้นหาพื้นที่">
+      <i data-lucide="search" style="color:var(--ink-soft);flex-shrink:0" aria-hidden="true"></i>
+      <input type="text" placeholder="ค้นหาพื้นที่ค้าขาย หรือจังหวัด..." readonly
+             aria-label="ค้นหาพื้นที่" style="cursor:pointer">
+      <span class="btn btn-primary btn-sm" style="flex-shrink:0;min-height:36px;border-radius:var(--radius-full)">ค้นหา</span>
+    </a>
+
+    {# Stats row #}
+    <div class="row gap4 fadeup" style="animation-delay:.30s;justify-content:center;margin-top:var(--s6);flex-wrap:wrap">
+      <div class="center-text">
+        <div class="h3" style="color:var(--brand)" id="stat-markets">—</div>
+        <div class="muted small">พื้นที่ทั่วไทย</div>
+      </div>
+      <div style="width:1px;height:36px;background:var(--line)" aria-hidden="true"></div>
+      <div class="center-text">
+        <div class="h3" style="color:var(--accent)" id="stat-lots">—</div>
+        <div class="muted small">ล็อกว่างทั้งหมด</div>
+      </div>
+      <div style="width:1px;height:36px;background:var(--line)" aria-hidden="true"></div>
+      <div class="center-text">
+        <div class="h3" style="color:var(--success)" id="stat-avg">—</div>
+        <div class="muted small">คะแนนเฉลี่ย</div>
+      </div>
+      <div style="width:1px;height:36px;background:var(--line)" aria-hidden="true"></div>
+      <div class="center-text">
+        <div class="h3" style="color:hsl(168,70%,36%)" id="stat-transparency">—</div>
+        <div class="muted small">ดัชนีความโปร่งใส</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ===== FEATURED MARKETS ===== #}
+<section class="container" style="padding-top:var(--s10)" aria-label="พื้นที่แนะนำ">
+  <div class="between mb4">
+    <div>
+      <div class="h2">พื้นที่แนะนำ</div>
+      <div class="muted sub mt1">พื้นที่ยอดนิยมที่มีล็อกว่างรอคุณอยู่</div>
+    </div>
+    <a href="/search" class="btn btn-ghost btn-sm hide-mobile" style="gap:var(--s1)">
+      ดูทั้งหมด <i data-lucide="arrow-right" style="width:15px;height:15px"></i>
+    </a>
+  </div>
+  <div id="featured-markets" class="grid2 stagger" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--s4)">
+    {# skeleton #}
+    {% for i in range(4) %}
+    <div class="market-card" style="pointer-events:none">
+      <div class="cover skeleton" style="height:140px;background:var(--bg-2)"></div>
+      <div class="body">
+        <div class="skeleton mb2" style="height:18px;width:70%"></div>
+        <div class="skeleton mb2" style="height:13px;width:50%"></div>
+        <div class="skeleton"     style="height:13px;width:40%"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="center mt4">
+    <a href="/search" class="btn btn-ghost">ดูพื้นที่ทั้งหมด <i data-lucide="arrow-right" style="width:16px;height:16px"></i></a>
+  </div>
+</section>
+
+{# ===== EXPLORE SYSTEM LAUNCHER ===== #}
+<section style="background:var(--bg-2,var(--surface));padding:var(--s10) 0" aria-label="สำรวจระบบ">
+  <div class="container">
+    <div class="center-text mb6">
+      <div class="h2">สำรวจระบบ</div>
+      <div class="muted sub mt2">เครื่องมือ Civic-Tech เปิดข้อมูลสาธารณะสำหรับทุกคน</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--s4)">
+      {% set pages = [
+        ('scroll-text',       'บัญชีการจัดสรร',         'ตรวจสอบทุกการจัดสรรพื้นที่ย้อนหลัง',         '/transparency',              'var(--accent-soft)',       'var(--accent)'),
+        ('scale',             'วิธีจัดสรรอย่างเป็นธรรม','อัลกอริทึมและเกณฑ์คะแนนที่ใช้จริง',          '/transparency/how-it-works', 'var(--brand-soft)',        'var(--brand)'),
+        ('map',               'แผนที่ + ความหนาแน่น',   'ดูพื้นที่แออัดและโซนความเสี่ยงแบบ Real-time', '/map',                       'hsl(45,90%,92%)',          'hsl(35,85%,42%)'),
+        ('sliders-horizontal','จำลองนโยบาย',             'ปรับตัวแปรและดูผลกระทบทันที',                 '/simulator',                 'var(--success-soft)',      'var(--success)'),
+        ('landmark',          'แดชบอร์ด กทม.',           'สถิติและตัวชี้วัดการจัดการพื้นที่เมือง',      '/gov',                       'hsl(262,60%,93%)',         'hsl(262,55%,45%)'),
+        ('search',            'ค้นหาพื้นที่',            'หาพื้นที่ว่างใกล้คุณได้เลยตอนนี้',            '/search',                    'var(--surface)',           'var(--ink)'),
+      ] %}
+      {% for icon, title, desc, href, bg, color in pages %}
+      <a href="{{ href }}"
+         style="display:flex;flex-direction:column;align-items:flex-start;gap:var(--s2);
+                background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);
+                padding:var(--s5);text-decoration:none;color:inherit;
+                transition:box-shadow .18s,transform .18s"
+         onmouseover="this.style.cssText+=';box-shadow:0 4px 20px rgba(0,0,0,.09);transform:translateY(-2px)'"
+         onmouseout="this.style.boxShadow='';this.style.transform=''">
+        <div style="width:44px;height:44px;border-radius:var(--radius-md);background:{{bg}};
+                    display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i data-lucide="{{ icon }}" style="width:22px;height:22px;color:{{color}}" aria-hidden="true"></i>
+        </div>
+        <div class="bold" style="font-size:.9rem;line-height:1.3">{{ title }}</div>
+        <div class="muted" style="font-size:.75rem;line-height:1.5;flex:1">{{ desc }}</div>
+        <div class="row gap1" style="align-items:center;font-size:.75rem;color:{{color}};margin-top:var(--s2)">
+          <span>เปิดดู</span>
+          <i data-lucide="arrow-right" style="width:12px;height:12px" aria-hidden="true"></i>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{# ===== HOW IT WORKS ===== #}
+<section style="background:var(--surface);padding:var(--s12) 0;margin-top:var(--s10)">
+  <div class="container">
+    <div class="center-text mb8">
+      <div class="h2">วิธีใช้งาน</div>
+      <div class="muted sub mt2">เริ่มต้นขายของในตลาดได้ใน 3 ขั้นตอนง่ายๆ</div>
+    </div>
+    <div class="grid3" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--s6)">
+      {% set steps = [
+        ('search','1. ค้นหาตลาด','เลือกตลาดตามจังหวัด ราคา หรือประเภทสินค้า พร้อมดูรีวิวจากผู้ขายคนอื่น','var(--brand-soft)','var(--brand)'),
+        ('calendar-check','2. เลือกล็อกและวันที่','เลือกล็อกที่ชอบ ดูราคา และยืนยันวันที่ต้องการขาย','var(--accent-soft)','var(--accent)'),
+        ('wallet','3. ชำระมัดจำ','ชำระมัดจำผ่าน PromptPay สะดวก รวดเร็ว ปลอดภัย','var(--success-soft)','var(--success)'),
+      ] %}
+      {% for icon, title, desc, bg, color in steps %}
+      <div class="center-text col" style="align-items:center;gap:var(--s3)">
+        <div class="center" style="width:64px;height:64px;border-radius:var(--radius-lg);background:{{bg}}">
+          <i data-lucide="{{ icon }}" style="width:28px;height:28px;color:{{color}}" aria-hidden="true"></i>
+        </div>
+        <div class="bold">{{ title }}</div>
+        <div class="muted sub center-text">{{ desc }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{# ===== RECENT REVIEWS ===== #}
+<section class="container" style="padding-top:var(--s10);padding-bottom:var(--s10)">
+  <div class="between mb4">
+    <div>
+      <div class="h2">เสียงจากผู้ใช้</div>
+      <div class="muted sub mt1">รีวิวจริงจากพ่อค้าแม่ค้าที่ใช้งาน</div>
+    </div>
+  </div>
+  <div id="recent-reviews" class="grid2 stagger" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--s4)">
+    <div class="card pad"><div class="skeleton" style="height:80px"></div></div>
+    <div class="card pad"><div class="skeleton" style="height:80px"></div></div>
+    <div class="card pad"><div class="skeleton" style="height:80px"></div></div>
+  </div>
+</section>
+
+{# ===== CTA SECTION ===== #}
+<section style="background:linear-gradient(135deg,var(--brand),hsl(var(--brand-h),var(--brand-s),38%));padding:var(--s12) var(--s5);text-align:center">
+  <div style="max-width:480px;margin:0 auto">
+    <div class="h2" style="color:#fff;margin-bottom:var(--s3)">พร้อมเริ่มต้นแล้วหรือยัง?</div>
+    <div style="color:rgba(255,255,255,.85);margin-bottom:var(--s6)">สมัครฟรี ไม่มีค่าสมัคร เริ่มหาพื้นที่ขายได้เลย</div>
+    <div class="row gap3" style="justify-content:center;flex-wrap:wrap">
+      <a href="/register" class="btn" style="background:#fff;color:var(--brand-ink)">เริ่มต้นใช้งาน</a>
+      <a href="/login" class="btn" style="background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.4)">เข้าสู่ระบบ</a>
+    </div>
+  </div>
+</section>
+
+{# ===== FOOTER ===== #}
+<footer style="background:var(--surface);border-top:1px solid var(--line);padding:var(--s6) var(--s5)">
+  <div class="container">
+    <div class="between" style="flex-wrap:wrap;gap:var(--s4)">
+      <div class="row gap2" style="align-items:center">
+        <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="" aria-hidden="true"
+             width="32" height="32" style="width:32px;height:32px;display:block">
+        <span class="bold">{{ app_name }}</span>
+      </div>
+      <div class="row gap4 muted small" style="flex-wrap:wrap">
+        <a href="/search">ค้นหาตลาด</a>
+        <a href="/map">แผนที่</a>
+        <a href="/transparency">ความโปร่งใส</a>
+        <a href="/gov">ข้อมูลภาครัฐ</a>
+        <a href="/admin/login" style="color:var(--ink-ghost)">ผู้ดูแลระบบ</a>
+      </div>
+      <div class="row gap2">
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="THEME.toggle();location.reload();" aria-label="สลับธีม" title="สลับธีมสว่าง/มืด">
+          <i data-lucide="moon" style="width:16px;height:16px"></i>
+        </button>
+      </div>
+    </div>
+    <div class="muted small mt4" style="text-align:center">© {{ app_name }} — ขับเคลื่อนธุรกิจตลาดไทย</div>
+  </div>
+</footer>
+
+{% endblock %}
+{% block script %}<script>
+async function loadFeatured() {
+  const d = await API.get("/markets/featured");
+  const wrap = $("#featured-markets");
+  if (!d.ok || !d.markets || !d.markets.length) {
+    wrap.innerHTML = '<div class="card pad center-text muted" style="grid-column:1/-1">ยังไม่มีตลาด</div>';
+    return;
+  }
+  wrap.innerHTML = d.markets.map(m => marketCardHTML(m)).join("");
+  icons(wrap);
+}
+
+async function loadReviews() {
+  const d = await API.get("/reviews/recent");
+  const wrap = $("#recent-reviews");
+  if (!d.ok || !d.reviews || !d.reviews.length) {
+    wrap.innerHTML = '<div class="card pad center-text muted" style="grid-column:1/-1">ยังไม่มีรีวิว</div>';
+    return;
+  }
+  wrap.innerHTML = d.reviews.map(r =>
+    `<div class="card pad-lg">
+      <div class="row gap2 mb2">
+        <div class="avatar" style="width:36px;height:36px;background:${avaColor(r.fromName)};font-size:15px">${esc(r.fromName.charAt(0))}</div>
+        <div class="flex1">
+          <div class="bold sub">${esc(r.fromName)}</div>
+          ${r.marketName ? `<div class="muted" style="font-size:.72rem">${esc(r.marketName)}</div>` : ""}
+        </div>
+        <div>${stars(r.rating, 13)}</div>
+      </div>
+      ${r.comment ? `<div class="sub muted" style="line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(r.comment)}</div>` : ""}
+    </div>`
+  ).join("");
+  icons(wrap);
+}
+
+async function loadStats() {
+  const d = await API.get("/stats");
+  if (!d.ok) return;
+  $("#stat-markets").textContent = (d.markets || 0) + "+";
+  $("#stat-lots").textContent = (d.availableLots || 0) + "+";
+  $("#stat-avg").textContent = d.avgRating ? "⭐ " + d.avgRating : "ใหม่";
+  const ti = d.transparencyIndex;
+  if (ti !== undefined) {
+    $("#stat-transparency").textContent = ti + "/100";
+  }
+}
+
+loadFeatured();
+loadReviews();
+loadStats();
+</script>{% endblock %}

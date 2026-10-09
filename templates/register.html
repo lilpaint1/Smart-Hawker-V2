@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}สมัครสมาชิก — {{ app_name }}{% endblock %}
+{% block sidebar %}{% endblock %}
+{% block shell_class %}shell-bare{% endblock %}
+{% block body %}
+<main class="center" style="min-height:100dvh;background:var(--bg);padding:var(--s5)" id="main-content">
+  <div class="card" style="width:100%;max-width:420px;padding:var(--s8)">
+
+    <div class="center mb5">
+      <a href="/" aria-label="{{ app_name }} — หน้าแรก">
+        <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="{{ app_name }}" width="52" height="52" style="width:52px;height:52px;display:block">
+      </a>
+    </div>
+
+    {# Step 1: Form #}
+    <div id="step-form">
+      <h1 class="h2 mb1">สร้างบัญชีใหม่</h1>
+      <p class="muted sub mb5">เลือกประเภทผู้ใช้ของคุณ</p>
+
+      {# Role cards — SELLER vs MARKET_OWNER (ใช้ ROLE_LABEL จาก constants) #}
+      <div class="grid2 mb4" role="radiogroup" aria-label="ประเภทผู้ใช้">
+        <button id="role-SELLER" class="role-card selected" type="button"
+                role="radio" aria-checked="true" onclick="pickRole('SELLER')">
+          <i data-lucide="store" aria-hidden="true"></i>
+          <span class="bold">ผู้ขาย</span>
+          <span class="muted small">พ่อค้าแม่ค้า — หาล็อกขายของ</span>
+        </button>
+        <button id="role-MARKET_OWNER" class="role-card" type="button"
+                role="radio" aria-checked="false" onclick="pickRole('MARKET_OWNER')">
+          <i data-lucide="building-2" aria-hidden="true"></i>
+          <span class="bold">เจ้าของตลาด</span>
+          <span class="muted small">ผู้ให้เช่าพื้นที่ — จัดการล็อก</span>
+        </button>
+      </div>
+
+      <div class="col gap3">
+        <div class="form-group">
+          <label class="label" for="name">ชื่อ-นามสกุล</label>
+          <input id="name" class="input" placeholder="เช่น สมหญิง ใจดี"
+                 autocomplete="name" enterkeyhint="next">
+        </div>
+        <div class="form-group">
+          <label class="label" for="phone">เบอร์โทรศัพท์</label>
+          <input id="phone" class="input" inputmode="numeric" maxlength="10"
+                 placeholder="08X-XXX-XXXX" autocomplete="tel" enterkeyhint="next">
+        </div>
+        <div class="form-group">
+          <label class="label" for="email">อีเมล <span class="ghost">(ไม่บังคับ)</span></label>
+          <input id="email" class="input" type="email"
+                 placeholder="you@email.com" autocomplete="email" enterkeyhint="go">
+        </div>
+      </div>
+      <div id="err1" class="form-err" role="alert" aria-live="polite"></div>
+      <button id="btn-reg" class="btn btn-primary btn-block mt4" onclick="submitReg()" type="button">
+        สมัครและรับ OTP
+      </button>
+      <p class="center-text muted sub mt4">
+        มีบัญชีแล้ว? <a href="/login" style="color:var(--brand-ink);font-weight:700">เข้าสู่ระบบ</a>
+      </p>
+    </div>
+
+    {# Step 2: OTP #}
+    <div id="step-otp" class="hide">
+      <h1 class="h2 mb1">ยืนยันเบอร์โทร</h1>
+      <p class="muted sub mb2">ส่งรหัส OTP ไปที่ <span id="phone-show" class="bold" style="color:var(--ink)"></span></p>
+      <div id="devbox" class="card pad mb4 hide" style="background:var(--success-soft);border-color:var(--success)">
+        <div class="row gap2">
+          <i data-lucide="key" style="width:16px;color:var(--success-ink)"></i>
+          <span class="small bold" style="color:var(--success-ink)">โหมดทดสอบ — รหัส OTP คือ <b id="devcode"></b></span>
+        </div>
+      </div>
+      <div class="otp-cells mb2" id="otp-cells" aria-label="กรอกรหัส OTP 6 หลัก">
+        {% for i in range(6) %}
+        <input class="otp-cell" type="text" inputmode="numeric" maxlength="1"
+               pattern="[0-9]" aria-label="หลักที่ {{ i+1 }}" data-idx="{{ i }}"
+               autocomplete="{% if i==0 %}one-time-code{% else %}off{% endif %}">
+        {% endfor %}
+      </div>
+      <div id="err2" class="form-err" role="alert" aria-live="polite"></div>
+      <button id="btn-verify" class="btn btn-primary btn-block mt3" onclick="verifyReg()" type="button">
+        ยืนยันและเริ่มใช้งาน
+      </button>
+      <button class="btn btn-ghost btn-block mt2 btn-sm" onclick="backToForm()" type="button">
+        กลับแก้ไขข้อมูล
+      </button>
+    </div>
+
+  </div>
+</main>
+{% endblock %}
+{% block script %}<script>
+let selectedRole = "SELLER";
+
+function pickRole(r) {
+  selectedRole = r;
+  for (const x of ["SELLER", "MARKET_OWNER"]) {
+    const btn = $("#role-" + x);
+    btn.classList.toggle("selected", x === r);
+    btn.setAttribute("aria-checked", x === r ? "true" : "false");
+  }
+  icons();
+}
+
+async function submitReg() {
+  const name  = ($("#name").value  || "").trim();
+  const phone = ($("#phone").value || "").replace(/\D/g, "");
+  const email = ($("#email").value || "").trim();
+  if (name.length < 2)  { $("#err1").textContent = "กรุณากรอกชื่อ (อย่างน้อย 2 ตัวอักษร)"; return; }
+  if (phone.length !== 10) { $("#err1").textContent = "เบอร์ต้องเป็นตัวเลข 10 หลัก"; return; }
+  const btn = $("#btn-reg");
+  setBtnLoading(btn, true);
+  const d = await API.post("/auth/register", { name, phone, email, role: selectedRole });
+  setBtnLoading(btn, false);
+  if (!d.ok) { $("#err1").textContent = d.error; return; }
+  $("#phone-show").textContent = phone;
+  if (d.dev) { $("#devcode").textContent = d.dev; $("#devbox").classList.remove("hide"); }
+  $("#step-form").classList.add("hide");
+  $("#step-otp").classList.remove("hide");
+  const cells = $$(".otp-cell");
+  if (cells[0]) cells[0].focus();
+}
+
+async function verifyReg() {
+  const phone = ($("#phone").value || "").replace(/\D/g, "");
+  const code  = $$(".otp-cell").map(c => c.value).join("");
+  if (code.length !== 6) { $("#err2").textContent = "กรุณากรอกรหัส OTP ให้ครบ 6 หลัก"; return; }
+  const btn = $("#btn-verify");
+  setBtnLoading(btn, true);
+  const d = await API.post("/auth/otp/verify", { phone, code });
+  setBtnLoading(btn, false);
+  if (!d.ok) { $("#err2").textContent = d.error; return; }
+  go(selectedRole === "MARKET_OWNER" ? "/owner" : "/search");
+}
+
+function backToForm() {
+  $$(".otp-cell").forEach(c => c.value = "");
+  $("#err2").textContent = "";
+  $("#devbox").classList.add("hide");
+  $("#step-otp").classList.add("hide");
+  $("#step-form").classList.remove("hide");
+}
+
+// OTP cells behaviour (same as login.html)
+document.addEventListener("DOMContentLoaded", () => {
+  const cells = $$(".otp-cell");
+  cells.forEach((cell, i) => {
+    cell.addEventListener("input", e => {
+      e.target.value = e.target.value.replace(/\D/g, "").slice(-1);
+      if (e.target.value && i < cells.length - 1) cells[i + 1].focus();
+      if (i === cells.length - 1 && e.target.value) verifyReg();
+    });
+    cell.addEventListener("keydown", e => {
+      if (e.key === "Backspace" && !cell.value && i > 0) cells[i - 1].focus();
+      if (e.key === "Enter") verifyReg();
+    });
+    cell.addEventListener("paste", e => {
+      e.preventDefault();
+      const pasted = (e.clipboardData || window.clipboardData).getData("text").replace(/\D/g, "");
+      pasted.slice(0, 6).split("").forEach((ch, j) => { if (cells[i + j]) cells[i + j].value = ch; });
+      cells[Math.min(i + pasted.length, cells.length - 1)].focus();
+      if (pasted.length >= 6) verifyReg();
+    });
+  });
+});
+</script>{% endblock %}

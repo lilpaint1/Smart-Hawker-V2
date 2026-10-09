@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}จองล็อก — {{ app_name }}{% endblock %}
+{% block body %}
+<div class="topbar">
+  <button class="back" onclick="history.back()" aria-label="กลับ" type="button">
+    <i data-lucide="chevron-left" aria-hidden="true"></i>
+  </button>
+  <h1>จองล็อก</h1>
+</div>
+
+<main class="page" id="main-content" style="padding-top:var(--s5);padding-bottom:var(--s10)">
+  <div id="lot-skeleton" class="skeleton" style="height:120px;border-radius:var(--radius-lg)"></div>
+  <div id="lot-info" class="hide"></div>
+  <div id="booking-form" class="hide">
+    <div class="card pad mt4">
+      <div class="label mb3">เลือกช่วงวันที่ขาย</div>
+      <div class="grid2 gap3">
+        <div class="form-group">
+          <label class="label" for="start-date">เริ่มวันที่</label>
+          <input id="start-date" class="input" type="date" oninput="calcPrice()" aria-required="true">
+        </div>
+        <div class="form-group">
+          <label class="label" for="end-date">ถึงวันที่</label>
+          <input id="end-date" class="input" type="date" oninput="calcPrice()" aria-required="true">
+        </div>
+      </div>
+      <div id="date-err" class="form-err" role="alert" aria-live="polite"></div>
+    </div>
+
+    <div class="card pad mt3" id="price-summary" style="display:none" aria-live="polite">
+      <div class="label mb3">สรุปค่าเช่า</div>
+      <div class="col gap2 sub">
+        <div class="between">
+          <span class="muted">ระยะเวลา</span>
+          <span id="days-count">—</span>
+        </div>
+        <div class="between">
+          <span class="muted">ราคาต่อวัน</span>
+          <span id="price-per-day">—</span>
+        </div>
+        <div class="between">
+          <span class="muted">ค่าเช่าทั้งหมด</span>
+          <span id="total-amt">—</span>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--line);margin:var(--s1) 0">
+        <div class="between bold" style="font-size:var(--text-base)">
+          <span>มัดจำ 50% (ชำระตอนนี้)</span>
+          <span id="deposit-amt" style="color:var(--brand-ink)">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group mt3">
+      <label class="label" for="note">หมายเหตุ <span class="ghost">(ไม่บังคับ)</span></label>
+      <textarea id="note" class="input" rows="2" placeholder="ประเภทสินค้า หรือความต้องการพิเศษ..."></textarea>
+    </div>
+
+    <div id="book-err" class="form-err" role="alert" aria-live="polite"></div>
+
+    <button id="btn-book" class="btn btn-primary btn-block mt4" onclick="submitBooking()" type="button" disabled
+            style="font-size:var(--text-base);gap:var(--s2)">
+      <i data-lucide="calendar-check" style="width:18px;height:18px" aria-hidden="true"></i>
+      ยืนยันการจอง
+    </button>
+    <p class="muted center-text small mt3">
+      <i data-lucide="shield-check" style="width:13px;height:13px" aria-hidden="true"></i>
+      มัดจำ 50% ชำระผ่าน PromptPay — ปลอดภัยและมีหลักฐาน
+    </p>
+  </div>
+</main>
+
+{% with active='search' %}{% include "_bottomnav.html" %}{% endwith %}
+{% endblock %}
+{% block script %}<script>
+const LID = "{{ lot_id }}";
+let lot = null;
+
+async function init() {
+  const d = await API.get("/lots/" + LID);
+  const skel = $("#lot-skeleton");
+  const info = $("#lot-info");
+  if (!d.ok) {
+    if (skel) skel.innerHTML = `<div class="center-text muted pad"><i data-lucide="alert-circle" style="width:32px;height:32px;color:var(--danger-ink)"></i><div class="mt2">${esc(d.error || "ไม่พบล็อกนี้")}</div></div>`;
+    icons(skel);
+    return;
+  }
+  lot = d.lot;
+  if (skel) skel.style.display = "none";
+
+  info.innerHTML = `
+    <a href="/market/${lot.marketId}" class="card pad card-press" aria-label="ดูรายละเอียดตลาด ${esc(lot.marketName)}">
+      <div class="row gap2 muted sub mb2">
+        <i data-lucide="map-pin" style="width:13px;height:13px" aria-hidden="true"></i>
+        ${esc(lot.marketName)}
+      </div>
+      <div class="row gap2 mb1" style="flex-wrap:wrap">
+        <span class="bold" style="font-size:var(--text-xl)">ล็อก ${esc(lot.code)}</span>
+        <span class="chip">${esc(C.RENT_TYPE_LABEL[lot.rentType] || lot.rentType)}</span>
+        ${lot.status !== "AVAILABLE" ? `<span class="chip chip-danger">ล็อกนี้ไม่ว่าง</span>` : ""}
+      </div>
+      ${lot.note ? `<div class="muted sub mb2">${esc(lot.note)}</div>` : ""}
+      <div class="price" style="font-size:var(--text-2xl)">${thb(lot.pricePerDay)}<span class="muted" style="font-size:var(--text-sm);font-weight:400">/วัน</span></div>
+    </a>`;
+  info.classList.remove("hide");
+  icons(info);
+
+  if (lot.status !== "AVAILABLE") {
+    const f = $("#booking-form");
+    if (f) { f.innerHTML = `<div class="card pad center-text mt4 muted"><i data-lucide="lock" style="width:32px;height:32px"></i><div class="mt2">ล็อกนี้ถูกจองแล้วหรือปิดอยู่</div><a href="javascript:history.back()" class="btn btn-ghost mt3">เลือกล็อกอื่น</a></div>`; f.classList.remove("hide"); icons(f); }
+    return;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const sd = $("#start-date"), ed = $("#end-date");
+  if (sd) { sd.min = today; sd.value = today; }
+  if (ed) { ed.min = today; ed.value = today; }
+
+  const form = $("#booking-form");
+  if (form) form.classList.remove("hide");
+  calcPrice();
+}
+
+function calcPrice() {
+  const sd = ($("#start-date") && $("#start-date").value) || "";
+  const ed = ($("#end-date")   && $("#end-date").value)   || "";
+  const errEl = $("#date-err"), summary = $("#price-summary"), btn = $("#btn-book");
+  if (errEl) errEl.textContent = "";
+  if (!sd || !ed) {
+    if (summary) summary.style.display = "none";
+    if (btn) btn.disabled = true;
+    return;
+  }
+  const s = new Date(sd), e = new Date(ed);
+  if (e < s) {
+    if (errEl) errEl.textContent = "วันสิ้นสุดต้องไม่ก่อนวันเริ่มต้น";
+    if (summary) summary.style.display = "none";
+    if (btn) btn.disabled = true;
+    return;
+  }
+  const days = Math.max(1, Math.round((e - s) / 86400000) + 1);
+  const ppd = lot ? lot.pricePerDay : 0;
+  const total = days * ppd;
+  const deposit = Math.ceil(total * 0.5);
+
+  const set = (id, val) => { const el = document.querySelector(id); if (el) el.textContent = val; };
+  set("#days-count",    `${days} วัน`);
+  set("#price-per-day", thb(ppd));
+  set("#total-amt",     thb(total));
+  set("#deposit-amt",   thb(deposit));
+
+  if (summary) summary.style.display = "";
+  if (btn) btn.disabled = false;
+}
+
+async function submitBooking() {
+  const sd   = ($("#start-date") && $("#start-date").value) || "";
+  const ed   = ($("#end-date")   && $("#end-date").value)   || "";
+  const note = ($("#note") && $("#note").value.trim()) || "";
+  const btn  = $("#btn-book"), errEl = $("#book-err");
+  if (!sd || !ed) { if (errEl) errEl.textContent = "กรุณาเลือกวันที่"; return; }
+  setBtnLoading(btn, true);
+  const d = await API.post("/bookings", { lotId: LID, startDate: sd, endDate: ed, note });
+  setBtnLoading(btn, false);
+  if (!d.ok) { if (errEl) errEl.textContent = d.error || "เกิดข้อผิดพลาด กรุณาลองใหม่"; return; }
+  go("/checkout/" + d.bookingId);
+}
+
+init();
+</script>{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}ตลาดที่บันทึกไว้ — {{ app_name }}{% endblock %}
+{% block body %}
+{% with title='ตลาดที่บันทึกไว้', subtitle='รายการโปรดของคุณ' %}{% include "_appheader.html" %}{% endwith %}
+
+<div class="page-pad" id="list"></div>
+
+{% with active='profile' %}{% include "_bottomnav.html" %}{% endwith %}
+{% endblock %}
+{% block script %}<script>
+async function load() {
+  const list = $("#list");
+  list.innerHTML = skelCards(3);
+  const d = await API.get("/favorites");
+  if (!d.ok || !d.markets || !d.markets.length) {
+    list.innerHTML = `<div class="card pad center-text muted mt4">
+      <i data-lucide="heart" style="width:48px;height:48px;color:var(--ink-ghost)"></i>
+      <div class="h3 mt3">ยังไม่มีตลาดที่บันทึก</div>
+      <div class="small mt1">กดหัวใจ ❤ ที่หน้าตลาดเพื่อบันทึกไว้</div>
+      <a href="/search" class="btn btn-primary btn-sm mt4">ค้นหาตลาด</a>
+    </div>`;
+    icons(list);
+    return;
+  }
+  list.innerHTML = d.markets.map(m => marketCardHTML(m, false)).join("");
+  icons(list);
+}
+
+load();
+</script>{% endblock %}

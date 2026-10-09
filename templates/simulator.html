@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+{% block title %}จำลองนโยบาย — {{ app_name }}{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+.sim-card { background:var(--surface);border-radius:var(--radius-lg);padding:24px;border:1px solid var(--line);margin-bottom:20px; }
+.slider-group { margin-bottom:20px; }
+.slider-label { display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:.9rem; }
+.slider-val { font-weight:700;color:var(--brand);min-width:60px;text-align:right; }
+input[type=range] {
+  width:100%;accent-color:var(--brand);cursor:pointer;height:6px;
+}
+.metric-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px; }
+.metric-card { background:var(--bg);border-radius:var(--radius);padding:16px;border:1px solid var(--line);text-align:center; }
+.metric-val { font-size:1.6rem;font-weight:700;line-height:1;margin-bottom:4px; }
+.metric-label { font-size:.78rem;color:var(--ink-soft); }
+.formula-toggle { background:none;border:1.5px dashed var(--line);border-radius:var(--radius);padding:10px 16px;
+  cursor:pointer;color:var(--ink-soft);font-family:inherit;font-size:.85rem;width:100%;margin-top:12px; }
+.formula-box { display:none;background:var(--bg);border-radius:var(--radius);padding:16px;font-family:monospace;font-size:.82rem;line-height:1.8;border-left:4px solid var(--brand);margin-top:10px;overflow-x:auto; }
+.formula-box.show { display:block; }
+.impact-positive { color:hsl(142,60%,36%); }
+.impact-negative { color:hsl(0,65%,45%); }
+.impact-neutral  { color:var(--ink-soft); }
+.tag-chip { display:inline-block;padding:2px 10px;border-radius:20px;font-size:.75rem;background:var(--brand-soft);color:var(--brand);font-weight:600;margin-right:4px; }
+</style>
+{% endblock %}
+{% block body %}
+{% with title='จำลองนโยบาย', subtitle='ปรับสไลเดอร์เพื่อดูผลกระทบต่อผู้ค้าและทางเท้า' %}{% include "_appheader.html" %}{% endwith %}
+
+<div class="page-pad">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px" class="sim-layout">
+
+    {# Left: sliders #}
+    <div>
+      <div class="sim-card">
+        <div class="bold mb4" style="font-size:1rem">ปรับพารามิเตอร์นโยบาย</div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span><i data-lucide="plus-square" style="width:14px;height:14px;vertical-align:middle"></i> จำนวนล็อกในตลาด</span>
+            <span class="slider-val" id="val-lots">50</span>
+          </div>
+          <input type="range" id="sl-lots" min="10" max="200" value="50" step="5" oninput="update()">
+          <div class="muted" style="font-size:.75rem">ปัจจุบัน: 10–200 ล็อก</div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span><i data-lucide="coins" style="width:14px;height:14px;vertical-align:middle"></i> ค่าเช่าต่อวัน (บาท)</span>
+            <span class="slider-val" id="val-price">300</span>
+          </div>
+          <input type="range" id="sl-price" min="50" max="1500" value="300" step="50" oninput="update()">
+          <div class="muted" style="font-size:.75rem">50–1,500 บาท/วัน</div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span><i data-lucide="users" style="width:14px;height:14px;vertical-align:middle"></i> % โควตาผู้ค้ารายย่อย</span>
+            <span class="slider-val" id="val-quota">20</span>
+          </div>
+          <input type="range" id="sl-quota" min="0" max="80" value="20" step="5" oninput="update()">
+          <div class="muted" style="font-size:.75rem">0 = ไม่มีโควตา, 80 = โควตา 80%</div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span><i data-lucide="maximize-2" style="width:14px;height:14px;vertical-align:middle"></i> ความกว้างทางเท้า (m)</span>
+            <span class="slider-val" id="val-sidewalk">2.5</span>
+          </div>
+          <input type="range" id="sl-sidewalk" min="1" max="6" value="2.5" step="0.5" oninput="update()">
+          <div class="muted" style="font-size:.75rem">ข้อกำหนด กทม.: ≥1.5m เหลือสำหรับคนเดิน</div>
+        </div>
+
+        <button class="formula-toggle" onclick="toggleFormula()" id="formula-toggle-btn">
+          โชว์สูตรการคำนวณ ▼
+        </button>
+        <div class="formula-box" id="formula-box">
+# ประมาณรายได้ผู้ค้า
+daily_rev_per_seller = price_per_day × 3.2  (กำไรจากขายเฉลี่ย 3.2× ค่าเช่า)
+total_income = lots × occupancy_rate × daily_rev_per_seller × 30
+
+# ความแออัด (%): ล็อกต่อทางเท้า (ล็อกกว้าง 1.2m)
+congestion = (lots × 1.2) / (sidewalk_m × 100) × 100
+
+# ความเป็นธรรม (0–100)
+fairness = 40 + (quota_pct × 0.4) + (price ≤ 300 ? 20 : price ≤ 600 ? 10 : 0)
+           + (congestion ≤ 40 ? 10 : congestion ≤ 70 ? 5 : 0)
+        </div>
+      </div>
+
+      <div class="sim-card">
+        <div class="bold mb3">ผลกระทบสรุป</div>
+        <div id="impact-list" style="line-height:2.2;font-size:.88rem"></div>
+      </div>
+    </div>
+
+    {# Right: output metrics #}
+    <div>
+      <div class="sim-card">
+        <div class="bold mb4" style="font-size:1rem">ผลลัพธ์จำลอง</div>
+        <div class="metric-grid">
+          <div class="metric-card">
+            <div class="metric-val" id="m-income" style="color:hsl(142,60%,36%)">—</div>
+            <div class="metric-label">รายได้รวม/เดือน (บาท)</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-val" id="m-congestion" style="color:#f59e0b">—</div>
+            <div class="metric-label">ความแออัดทางเท้า (%)</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-val" id="m-fairness" style="color:var(--brand)">—</div>
+            <div class="metric-label">คะแนนความเป็นธรรม</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-val" id="m-sellers" style="color:hsl(168,70%,36%)">—</div>
+            <div class="metric-label">ผู้ค้าที่ได้โควตา</div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px">
+          <div class="bold sub mb2">คำแนะนำนโยบาย</div>
+          <div id="policy-rec" style="font-size:.88rem;line-height:1.8;padding:14px;background:var(--bg);border-radius:var(--radius);border-left:4px solid var(--accent)"></div>
+        </div>
+      </div>
+
+      <div class="sim-card">
+        <div class="bold mb3">เปรียบเทียบกับค่าเริ่มต้น กทม.</div>
+        <div id="compare-table" style="font-size:.85rem"></div>
+      </div>
+
+      <div class="sim-card">
+        <div class="bold mb3" style="display:flex;justify-content:space-between;align-items:center">
+          Before / After Radar
+          <span id="baseline-badge" style="font-size:.72rem;color:var(--ink-soft)">ค่า Baseline: static</span>
+        </div>
+        <canvas id="radar-chart" style="max-height:280px"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% with active='simulator' %}{% include "_bottomnav.html" %}{% endwith %}
+{% endblock %}
+{% block script %}<script>
+let formulaVisible = false;
+let _radarChart = null;
+
+// Real baseline loaded from /api/gov/summary — falls back to static BKK defaults
+let BASE = { lots: 40, price: 250, quota: 0, sidewalk: 2.0, label: "ค่าเริ่มต้น กทม." };
+
+async function loadBaseline() {
+  const d = await API.get("/gov/summary");
+  if (!d.ok || !d.districts || !d.districts.length) return;
+  const all = d.districts;
+  const avgLots     = Math.round(all.reduce((s, x) => s + x.totalLots, 0) / all.length);
+  const avgFairness = Math.round(all.reduce((s, x) => s + x.fairnessIndex, 0) / all.length);
+  const avgSidewalk = parseFloat((all.reduce((s, x) => s + (x.avgSidewalkM || 2.0), 0) / all.length).toFixed(1));
+
+  BASE = { lots: avgLots || 40, price: 250, quota: 0, sidewalk: avgSidewalk, label: "ค่าเฉลี่ย กทม. (Live)" };
+  document.getElementById("baseline-badge").textContent = `Baseline: ${BASE.label}`;
+
+  // Push slider defaults to match real data
+  document.getElementById("sl-lots").value     = Math.min(200, Math.max(10, avgLots));
+  document.getElementById("sl-sidewalk").value = Math.min(6, Math.max(1, avgSidewalk));
+  update();
+}
+
+loadBaseline();
+
+function toggleFormula() {
+  formulaVisible = !formulaVisible;
+  document.getElementById("formula-box").classList.toggle("show", formulaVisible);
+  document.getElementById("formula-toggle-btn").textContent =
+    formulaVisible ? "ซ่อนสูตร ▲" : "โชว์สูตรการคำนวณ ▼";
+}
+
+function fmt(n) { return n.toLocaleString("th-TH", { maximumFractionDigits: 0 }); }
+
+function update() {
+  const lots     = parseInt(document.getElementById("sl-lots").value);
+  const price    = parseInt(document.getElementById("sl-price").value);
+  const quota    = parseInt(document.getElementById("sl-quota").value);
+  const sidewalk = parseFloat(document.getElementById("sl-sidewalk").value);
+
+  document.getElementById("val-lots").textContent     = lots;
+  document.getElementById("val-price").textContent    = thb(price);
+  document.getElementById("val-quota").textContent    = quota + "%";
+  document.getElementById("val-sidewalk").textContent = sidewalk.toFixed(1) + " m";
+
+  // Occupancy rate: assumed 80% base, higher price → lower occupancy
+  const occupancy = Math.max(0.3, 0.85 - (price - 300) / 5000);
+
+  // Revenue calculation
+  const dailyRevPerSeller = price * 3.2;
+  const activeSellers     = Math.round(lots * occupancy);
+  const totalIncome       = Math.round(activeSellers * dailyRevPerSeller * 30);
+
+  // Congestion: each lot = 1.2m wide; sidewalk_m × 100 = total sidewalk capacity in meters
+  const totalWidth = lots * 1.2;
+  const congestion = Math.min(100, Math.round((totalWidth / (sidewalk * 100)) * 100));
+
+  // Fairness
+  let fairness = 40;
+  fairness += quota * 0.4;
+  if (price <= 300) fairness += 20;
+  else if (price <= 600) fairness += 10;
+  if (congestion <= 40) fairness += 10;
+  else if (congestion <= 70) fairness += 5;
+  fairness = Math.min(100, Math.round(fairness));
+
+  const quotaSellers = Math.round(activeSellers * quota / 100);
+
+  // Display
+  document.getElementById("m-income").textContent     = "฿" + fmt(totalIncome);
+  document.getElementById("m-congestion").textContent = congestion + "%";
+  document.getElementById("m-fairness").textContent   = fairness + "/100";
+  document.getElementById("m-sellers").textContent    = quotaSellers + " คน";
+
+  // Color congestion
+  const congEl = document.getElementById("m-congestion");
+  congEl.style.color = congestion >= 70 ? "#ef4444" : congestion >= 40 ? "#f59e0b" : "hsl(142,60%,36%)";
+
+  // Policy recommendation
+  let recs = [];
+  if (congestion >= 80) recs.push("⚠️ <b>ความแออัดสูงมาก</b> — ควรลดจำนวนล็อก หรือขยายทางเท้า");
+  if (congestion >= 50 && congestion < 80) recs.push("ความแออัดปานกลาง — ควรจัดผู้ค้าเป็นรอบ เช้า/บ่าย");
+  if (price > 800) recs.push("💰 <b>ค่าเช่าสูง</b> — อาจกีดกันผู้ค้ารายย่อย พิจารณาอุดหนุนโควตา");
+  if (quota >= 30) recs.push("✅ โควตารายย่อยดี — ช่วยสร้างความเป็นธรรมในการเข้าถึงพื้นที่");
+  if (sidewalk < 1.5) recs.push("🚶 <b>ทางเท้าแคบกว่าเกณฑ์ กทม.</b> (1.5m) — ต้องพิจารณาลดล็อก");
+  if (fairness >= 75) recs.push("🏆 ดัชนีความเป็นธรรมสูง — นโยบายนี้เหมาะกับ Smart Hawker");
+  if (!recs.length) recs.push("นโยบายสมดุลดี — ดำเนินการต่อได้");
+
+  document.getElementById("policy-rec").innerHTML = recs.join("<br>");
+
+  // Impact list
+  const impacts = [
+    { label: "จำนวนผู้ค้าที่ได้พื้นที่", val: activeSellers + " คน/วัน", cls: activeSellers >= 40 ? "impact-positive" : "impact-neutral" },
+    { label: "ความแออัดบนทางเท้า",       val: congestion + "%",         cls: congestion >= 70 ? "impact-negative" : congestion >= 40 ? "impact-neutral" : "impact-positive" },
+    { label: "รายได้เฉลี่ยต่อผู้ค้า/เดือน", val: "฿" + fmt(dailyRevPerSeller*30 * occupancy), cls: "impact-positive" },
+    { label: "สัดส่วนโควตารายย่อย",       val: quota + "% (" + quotaSellers + " คน)", cls: quota >= 20 ? "impact-positive" : "impact-neutral" },
+    { label: "คะแนนความเป็นธรรม",         val: fairness + "/100",       cls: fairness >= 70 ? "impact-positive" : fairness >= 50 ? "impact-neutral" : "impact-negative" },
+  ];
+  document.getElementById("impact-list").innerHTML = impacts.map(i =>
+    `<div class="${i.cls}">→ ${i.label}: <b>${i.val}</b></div>`
+  ).join("");
+
+  // Compare table — uses module-level BASE (live or static)
+  const bOcc   = Math.max(0.3, 0.85 - (BASE.price - 300) / 5000);
+  const bIncome = Math.round(BASE.lots * bOcc * BASE.price * 3.2 * 30);
+  const bCong   = Math.min(100, Math.round((BASE.lots * 1.2 / (BASE.sidewalk * 100)) * 100));
+  const bFair   = Math.min(100, Math.round(40 + BASE.quota * 0.4 + 20 + (bCong <= 40 ? 10 : 0)));
+
+  const rows = [
+    { label: "รายได้รวม/เดือน", base: "฿"+fmt(bIncome),   sim: "฿"+fmt(totalIncome), better: totalIncome > bIncome },
+    { label: "ความแออัด",       base: bCong+"%",            sim: congestion+"%",        better: congestion < bCong },
+    { label: "ความเป็นธรรม",    base: bFair+"/100",          sim: fairness+"/100",       better: fairness > bFair },
+  ];
+  document.getElementById("compare-table").innerHTML = `
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr>
+          <th style="padding:8px;text-align:left;border-bottom:2px solid var(--line)">ตัวชี้วัด</th>
+          <th style="padding:8px;text-align:center;border-bottom:2px solid var(--line)">${esc(BASE.label)}</th>
+          <th style="padding:8px;text-align:center;border-bottom:2px solid var(--line)">นโยบายใหม่</th>
+          <th style="padding:8px;text-align:center;border-bottom:2px solid var(--line)">ผล</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => `
+          <tr>
+            <td style="padding:8px;border-bottom:1px solid var(--line)">${r.label}</td>
+            <td style="padding:8px;text-align:center;border-bottom:1px solid var(--line);color:var(--ink-soft)">${r.base}</td>
+            <td style="padding:8px;text-align:center;border-bottom:1px solid var(--line);font-weight:700">${r.sim}</td>
+            <td style="padding:8px;text-align:center;border-bottom:1px solid var(--line)">${r.better ? "✅ ดีขึ้น" : "⬇️ แย่ลง"}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>`;
+
+  // Before/After radar chart
+  const bSeller = Math.round(BASE.lots * bOcc);
+  const incMax  = Math.max(totalIncome, bIncome, 1);
+  const selMax  = Math.max(activeSellers, bSeller, 1);
+  function norm(v, max) { return Math.round((v / max) * 100); }
+  const radarLabels  = ["รายได้รวม", "ผู้ค้าที่ได้ล็อก", "ความเป็นธรรม", "ไม่แออัด", "โควตารายย่อย"];
+  const baselineData = [ norm(bIncome, incMax),  norm(bSeller, selMax),  bFair,   100 - bCong,   BASE.quota ];
+  const simData      = [ norm(totalIncome, incMax), norm(activeSellers, selMax), fairness, 100 - congestion, quota ];
+
+  if (_radarChart) {
+    _radarChart.data.datasets[0].data  = baselineData;
+    _radarChart.data.datasets[0].label = BASE.label;
+    _radarChart.data.datasets[1].data  = simData;
+    _radarChart.options.plugins.title.text = `${BASE.label} vs. นโยบายใหม่`;
+    _radarChart.update();
+  } else if (document.getElementById("radar-chart")) {
+    _radarChart = new Chart(document.getElementById("radar-chart").getContext("2d"), {
+      type: "radar",
+      data: {
+        labels: radarLabels,
+        datasets: [
+          { label: BASE.label,       data: baselineData,
+            borderColor: "rgba(148,163,184,.9)", backgroundColor: "rgba(148,163,184,.15)",
+            pointBackgroundColor: "rgba(148,163,184,.9)", borderWidth: 2 },
+          { label: "นโยบายใหม่",   data: simData,
+            borderColor: "rgba(236,19,91,.85)", backgroundColor: "rgba(236,19,91,.12)",
+            pointBackgroundColor: "rgba(236,19,91,.85)", borderWidth: 2 },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: "bottom", labels: { font: { size: 11 } } },
+          title:  { display: true, text: `${BASE.label} vs. นโยบายใหม่`, font: { size: 11 }, color: "gray" },
+        },
+        scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 20, font: { size: 9 } }, pointLabels: { font: { size: 10 } } } },
+      },
+    });
+  }
+}
+
+// Responsive layout
+if (window.innerWidth < 768) {
+  document.querySelector(".sim-layout").style.gridTemplateColumns = "1fr";
+}
+
+update();
+</script>{% endblock %}

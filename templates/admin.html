@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}แดชบอร์ดผู้ดูแล — {{ app_name }}{% endblock %}
+{% block body %}
+{% with title='แดชบอร์ดผู้ดูแล', subtitle='ภาพรวมระบบ Smart Hawker' %}{% include "_appheader.html" %}{% endwith %}
+
+<div class="page-pad">
+  {# KPI cards #}
+  <div id="kpi-row" class="grid4 gap3 mb4">
+    <div class="skeleton" style="height:88px;border-radius:var(--radius-lg)"></div>
+    <div class="skeleton" style="height:88px;border-radius:var(--radius-lg)"></div>
+    <div class="skeleton" style="height:88px;border-radius:var(--radius-lg)"></div>
+    <div class="skeleton" style="height:88px;border-radius:var(--radius-lg)"></div>
+  </div>
+
+  {# Revenue card #}
+  <div id="revenue-card" class="card pad mb4 hide" style="background:linear-gradient(135deg,var(--brand),var(--accent))">
+    <div class="row gap3" style="align-items:center">
+      <i data-lucide="wallet" style="width:32px;height:32px;color:#fff" aria-hidden="true"></i>
+      <div>
+        <div class="muted small" style="color:rgba(255,255,255,.8)">รายได้มัดจำรวม</div>
+        <div class="h2" id="revenue-val" style="color:#fff">—</div>
+      </div>
+    </div>
+  </div>
+
+  {# SVG time-series chart #}
+  <div class="card pad mb4">
+    <div class="between mb3">
+      <div class="label">การจองรายวัน (30 วัน)</div>
+      <div class="row gap2">
+        <button class="chip chip-sm chip-active" onclick="loadChart(30)" type="button">30 วัน</button>
+        <button class="chip chip-sm" onclick="loadChart(7)" type="button">7 วัน</button>
+      </div>
+    </div>
+    <div id="chart-wrap" style="overflow-x:auto">
+      <div class="skeleton" style="height:120px;border-radius:var(--radius)"></div>
+    </div>
+  </div>
+
+  {# Admin nav links #}
+  <div class="grid2 gap3 mb4">
+    <a href="/admin/users" class="card card-press pad row gap3" style="text-decoration:none;color:var(--ink)">
+      <div style="width:40px;height:40px;border-radius:var(--radius-lg);background:var(--brand-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i data-lucide="users" style="width:20px;height:20px;color:var(--brand-ink)" aria-hidden="true"></i>
+      </div>
+      <div>
+        <div class="bold sub">จัดการผู้ใช้</div>
+        <div class="ghost small">ระงับ / ยืนยัน / ลบ</div>
+      </div>
+    </a>
+    <a href="/admin/markets" class="card card-press pad row gap3" style="text-decoration:none;color:var(--ink)">
+      <div style="width:40px;height:40px;border-radius:var(--radius-lg);background:#ecfdf5;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i data-lucide="store" style="width:20px;height:20px;color:var(--success-ink)" aria-hidden="true"></i>
+      </div>
+      <div>
+        <div class="bold sub">จัดการตลาด</div>
+        <div class="ghost small">รับรอง / ฟีเจอร์</div>
+      </div>
+    </a>
+    <a href="/admin/audit" class="card card-press pad row gap3" style="text-decoration:none;color:var(--ink)">
+      <div style="width:40px;height:40px;border-radius:var(--radius-lg);background:#fff7ed;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i data-lucide="file-text" style="width:20px;height:20px;color:var(--warn-ink)" aria-hidden="true"></i>
+      </div>
+      <div>
+        <div class="bold sub">บันทึกการกระทำ</div>
+        <div class="ghost small">ดู Audit Log</div>
+      </div>
+    </a>
+    <div class="card pad">
+      <div class="bold sub mb2">ส่งออกข้อมูล</div>
+      <div class="col gap1">
+        <a href="/api/admin/export/users.csv" class="btn btn-soft btn-sm" download aria-label="ดาวน์โหลดข้อมูลผู้ใช้ CSV">
+          <i data-lucide="download" style="width:14px;height:14px" aria-hidden="true"></i>ผู้ใช้ .csv
+        </a>
+        <a href="/api/admin/export/bookings.csv" class="btn btn-soft btn-sm" download aria-label="ดาวน์โหลดข้อมูลการจอง CSV">
+          <i data-lucide="download" style="width:14px;height:14px" aria-hidden="true"></i>การจอง .csv
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {# Recent bookings #}
+  <div class="label mb2">การจองล่าสุด</div>
+  <div id="recent-list" class="stagger">
+    <div class="skeleton mt2" style="height:68px;border-radius:var(--radius-lg)"></div>
+    <div class="skeleton mt2" style="height:68px;border-radius:var(--radius-lg)"></div>
+  </div>
+</div>
+
+{% with active='admin' %}{% include "_bottomnav.html" %}{% endwith %}
+{% endblock %}
+{% block script %}<script>
+let chartDays = 30;
+
+async function loadStats() {
+  const d = await API.get("/admin/stats");
+  if (!d.ok) { Toast.error(d.error || "ไม่สามารถโหลดสถิติ"); return; }
+  const s = d.stats;
+  const kpi = $("#kpi-row");
+  if (kpi) kpi.innerHTML = [
+    ["users",          "ผู้ขาย",        s.sellers,  "var(--brand)"],
+    ["building-2",     "เจ้าของตลาด",   s.owners,   "#0ea5e9"],
+    ["store",          "ตลาดทั้งหมด",   s.markets,  "#f59e0b"],
+    ["calendar-check", "การจองทั้งหมด", s.bookings, "#7950f2"],
+  ].map(([icon, label, val, color]) =>
+    `<div class="stat-card">
+      <i data-lucide="${icon}" style="width:20px;height:20px;color:${color}" aria-hidden="true"></i>
+      <div class="stat-value">${val}</div>
+      <div class="stat-label">${label}</div>
+    </div>`
+  ).join("");
+  icons(kpi);
+
+  const rv = $("#revenue-val");
+  if (rv) rv.textContent = thb(s.revenue || 0);
+  const rc = $("#revenue-card");
+  if (rc) { rc.classList.remove("hide"); icons(rc); }
+
+  const rl = $("#recent-list");
+  if (rl) {
+    rl.innerHTML = (d.recent || []).length
+      ? (d.recent || []).map(r => `
+          <div class="card pad between mt2">
+            <div>
+              <div class="bold sub">${esc(r.seller)}</div>
+              <div class="muted small">${esc(r.market)} · ล็อก ${esc(r.lot)}</div>
+            </div>
+            <div class="center-text">
+              <div class="price sub" style="color:var(--brand-ink)">${thb(r.amount)}</div>
+              <div class="ghost" style="font-size:.65rem">${esc(r.status)}</div>
+            </div>
+          </div>`).join("")
+      : `<div class="muted center-text card pad mt2">ยังไม่มีการจอง</div>`;
+    icons(rl);
+  }
+}
+
+async function loadChart(days) {
+  chartDays = days;
+  // Update active chip
+  document.querySelectorAll(".chart-day-btn").forEach(b => b.classList.remove("chip-active"));
+  const wrap = $("#chart-wrap");
+  if (wrap) wrap.innerHTML = `<div class="skeleton" style="height:120px;border-radius:var(--radius)"></div>`;
+  const d = await API.get("/admin/stats/chart?days=" + days);
+  if (!d.ok || !d.data || !d.data.length) {
+    if (wrap) wrap.innerHTML = `<div class="muted center-text" style="padding:2rem">ไม่มีข้อมูล</div>`;
+    return;
+  }
+  renderChart(d.data, wrap);
+}
+
+function renderChart(data, wrap) {
+  const W = Math.max(wrap ? wrap.clientWidth : 600, 600);
+  const H = 120, PAD = 28, RPAD = 40;
+  const maxVal = Math.max(...data.map(d => d.count || 0), 1);
+  const innerW = W - PAD - RPAD;
+  const innerH = H - 16;
+  const barW = Math.max(4, innerW / data.length - 3);
+
+  const bars = data.map((d, i) => {
+    const x = PAD + (i / data.length) * innerW;
+    const barH = Math.max(2, (d.count / maxVal) * innerH);
+    const y = H - barH;
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}"
+              rx="2" fill="var(--brand)" opacity=".85">
+              <title>${d.date}: ${d.count} การจอง${d.revenue ? " · " + thb(d.revenue) : ""}</title>
+            </rect>`;
+  }).join("");
+
+  const labels = data.filter((_, i) => i % Math.ceil(data.length / 5) === 0).map(d => {
+    const i = data.indexOf(d);
+    const x = PAD + (i / data.length) * innerW + barW / 2;
+    return `<text x="${x.toFixed(1)}" y="${H + 14}" text-anchor="middle" font-size="9" fill="var(--ink-ghost)">${d.date.slice(5)}</text>`;
+  }).join("");
+
+  const yLabels = [0, Math.round(maxVal / 2), maxVal].map(v => {
+    const y = H - (v / maxVal) * innerH;
+    return `<text x="${PAD - 4}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--ink-ghost)">${v}</text>
+            <line x1="${PAD}" y1="${y.toFixed(1)}" x2="${(W - RPAD).toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="0.5"/>`;
+  }).join("");
+
+  if (wrap) wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H + 20}" style="width:100%;min-width:320px;overflow:visible" role="img" aria-label="กราฟการจองรายวัน">
+    ${yLabels}${bars}${labels}
+  </svg>`;
+}
+
+loadStats();
+loadChart(chartDays);
+</script>{% endblock %}

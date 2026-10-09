@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Smart Hawker">
+  <defs>
+    <linearGradient id="fav-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff4d8d"/>
+      <stop offset="1" stop-color="#d61f63"/>
+    </linearGradient>
+  </defs>
+  <rect x="3" y="3" width="58" height="58" rx="17" fill="url(#fav-bg)"/>
+  <path d="M13 24 Q32 15.5 51 24 L51 27
+           q-3.17 4 -6.33 0 q-3.17 4 -6.33 0 q-3.17 4 -6.33 0
+           q-3.17 4 -6.33 0 q-3.17 4 -6.33 0 q-3.17 4 -6.33 0
+           L13 24 Z" fill="#ffffff"/>
+  <rect x="16.5" y="29" width="3.4" height="21" rx="1.7" fill="#ffffff" opacity=".95"/>
+  <rect x="44.1" y="29" width="3.4" height="21" rx="1.7" fill="#ffffff" opacity=".95"/>
+  <rect x="19.5" y="41" width="25" height="9" rx="2.2" fill="#ffffff" opacity=".92"/>
+  <circle cx="32" cy="35.5" r="3.1" fill="#ffd6e4"/>
+</svg>
