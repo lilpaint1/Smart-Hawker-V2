@@ -81,4 +81,4 @@ static/         CSS และ JS
 
 ## ผู้พัฒนา
 
-`<ชื่อ>` · [GitHub](https://github.com/lilpaint1)
+`<Nathakorn>` · [GitHub](https://github.com/lilpaint1)
